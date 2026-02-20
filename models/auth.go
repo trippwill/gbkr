@@ -11,16 +11,25 @@ type SSOInitRequest struct {
 	Publish *bool `json:"publish,omitempty"`
 }
 
-// SessionStatus is the response for SSO init and auth status endpoints.
+// SessionStatus is the response for POST /iserver/auth/ssodh/init and POST /iserver/auth/status.
 type SessionStatus struct {
+	// Authenticated indicates if the session is authenticated.
 	Authenticated bool
-	Connected     bool
-	Competing     bool
-	Established   bool
-	Fail          string
-	MAC           string
-	HardwareInfo  string
-	ServerName    string
+	// Connected indicates if connected to the brokerage.
+	Connected bool
+	// Competing indicates if another session is competing.
+	Competing bool
+	// Established indicates if the session is established.
+	Established bool
+	// Fail contains the failure message; empty on success.
+	Fail string
+	// MAC is the MAC address.
+	MAC string
+	// HardwareInfo is the hardware info. (API: "hardware_info")
+	HardwareInfo string
+	// ServerName is the server name.
+	ServerName string
+	// ServerVersion is the server version.
 	ServerVersion string
 }
 

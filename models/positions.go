@@ -2,21 +2,35 @@ package models
 
 import "encoding/json"
 
-// Position represents a single portfolio position.
+// Position represents a single portfolio position returned by
+// GET /portfolio/{accountId}/positions/{pageId}.
 type Position struct {
-	AcctID        AccountID
-	ConID         ConID
-	ContractDesc  string
-	Qty           float64
-	MktPrice      float64
-	MktValue      float64
-	AvgCost       float64
-	AvgPrice      float64
-	RealizedPnL   float64
+	// AcctID is the account identifier.
+	AcctID AccountID
+	// ConID is the contract identifier.
+	ConID ConID
+	// ContractDesc is the local symbol / contract description.
+	ContractDesc string
+	// Qty is the total size of the position. (API: "position")
+	Qty float64
+	// MktPrice is the current market price per share.
+	MktPrice float64
+	// MktValue is the total market value of the position.
+	MktValue float64
+	// AvgCost is the average cost per share multiplied by the contract multiplier.
+	AvgCost float64
+	// AvgPrice is the average purchase price per share.
+	AvgPrice float64
+	// RealizedPnL is the realized profit/loss.
+	RealizedPnL float64
+	// UnrealizedPnL is the unrealized profit/loss.
 	UnrealizedPnL float64
-	Currency      Currency
-	AssetClass    AssetClass
-	Ticker        string
+	// Currency is the traded currency.
+	Currency Currency
+	// AssetClass is the security type (STK, OPT, etc.).
+	AssetClass AssetClass
+	// Ticker is the ticker symbol.
+	Ticker string
 }
 
 func (p *Position) UnmarshalJSON(data []byte) error {
@@ -55,16 +69,23 @@ func (p *Position) UnmarshalJSON(data []byte) error {
 }
 
 // PortfolioSummary is the response for GET /portfolio/{accountId}/summary.
+// It maps field names to their corresponding summary field objects.
 type PortfolioSummary map[string]PortfolioSummaryField
 
 // PortfolioSummaryField represents a single field within a portfolio summary.
 type PortfolioSummaryField struct {
-	Amount    float64
-	Currency  Currency
-	IsNull    bool
-	Severity  int
+	// Amount is the numeric amount of the field.
+	Amount float64
+	// Currency is the currency code for the field value.
+	Currency Currency
+	// IsNull indicates whether the field value is null.
+	IsNull bool
+	// Severity is the severity level of the field.
+	Severity int
+	// Timestamp is the epoch time when the field was last updated.
 	Timestamp int64
-	Value     string
+	// Value is the string representation of the field.
+	Value string
 }
 
 func (f *PortfolioSummaryField) UnmarshalJSON(data []byte) error {
@@ -89,29 +110,42 @@ func (f *PortfolioSummaryField) UnmarshalJSON(data []byte) error {
 }
 
 // Ledger is the response for GET /portfolio/{accountId}/ledger.
+// It maps currency codes to their corresponding ledger entries.
 type Ledger map[Currency]LedgerEntry
 
 // LedgerEntry holds ledger data for a single currency.
 type LedgerEntry struct {
+	// CommodityMarketValue is the market value of commodity positions.
 	CommodityMarketValue float64
-	FutureOptionValue    float64
-	FuturesPnL           float64
-	Interest             float64
-	NetLiquidation       float64
-	RealizedPnL          float64
-	SettledCash          float64
-	StockMarketValue     float64
-	TotalCashValue       float64
-	UnrealizedPnL        float64
-	Currency             Currency
-	Key                  string
+	// FutureOptionValue is the market value of futures options positions.
+	FutureOptionValue float64
+	// FuturesPnL is the PnL of futures positions. (API: "futuresonlypnl")
+	FuturesPnL float64
+	// Interest is the receivable interest balance.
+	Interest float64
+	// NetLiquidation is the net liquidation value of positions. (API: "netliquidationvalue")
+	NetLiquidation float64
+	// RealizedPnL is the realized PnL.
+	RealizedPnL float64
+	// SettledCash is the settled cash balance.
+	SettledCash float64
+	// StockMarketValue is the market value of stock positions.
+	StockMarketValue float64
+	// TotalCashValue is the total cash value.
+	TotalCashValue float64
+	// UnrealizedPnL is the unrealized PnL.
+	UnrealizedPnL float64
+	// Currency is the three-letter currency code.
+	Currency Currency
+	// Key is always "LedgerList".
+	Key string
 }
 
 func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		CommodityMarketValue *float64 `json:"commoditymarketvalue,omitempty"`
-		FutureOptionValue    *float64 `json:"futureoptionvalue,omitempty"`
-		FuturesPnL           *float64 `json:"futuresnlvalue,omitempty"`
+		FutureOptionValue    *float64 `json:"futureoptionmarketvalue,omitempty"`
+		FuturesPnL           *float64 `json:"futuresonlypnl,omitempty"`
 		Interest             *float64 `json:"interest,omitempty"`
 		NetLiquidation       *float64 `json:"netliquidationvalue,omitempty"`
 		RealizedPnL          *float64 `json:"realizedpnl,omitempty"`

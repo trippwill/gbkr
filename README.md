@@ -34,7 +34,7 @@ func main() {
     client, err := gbkr.NewClient(
         gbkr.WithBaseURL("https://localhost:5000/v1/api"),
         gbkr.WithInsecureTLS(),
-        gbkr.WithPermissions(gbkr.ReadOnlyAuth),
+        gbkr.WithPermissions(gbkr.ReadOnlyAuth()),
     )
     if err != nil {
         log.Fatal(err)
@@ -59,7 +59,7 @@ Permissions use three-tier enums (`Area`, `Resource`, `Action`). A zero value in
 
 ```go
 // Grant all read permissions + auth login
-gbkr.WithPermissions(gbkr.ReadOnlyAuth)
+gbkr.WithPermissions(gbkr.ReadOnlyAuth())
 
 // Grant specific permissions
 gbkr.WithPermissions(gbkr.PermissionSet{
@@ -144,6 +144,68 @@ go run ./cmd/gbkr --base-url https://localhost:5000/v1/api --insecure
 go run ./cmd/gbkr --permissions-file cmd/gbkr/examples/readonly.yaml --insecure
 # Uses file as floor; prompts only for anything missing
 ```
+
+## Field Name Mapping
+
+Model structs use friendly Go names where the IBKR API uses abbreviations or
+inconsistent casing. The table below lists every rename; JSON serialization
+uses the original API keys so wire compatibility is preserved.
+
+### PnLEntry (`GET /iserver/account/pnl/partitioned`)
+
+| Go Field | API Key | Description |
+|----------|---------|-------------|
+| `DailyPnL` | `dpl` | Daily profit/loss |
+| `NetLiquidation` | `nl` | Net liquidity |
+| `UnrealizedPnL` | `upl` | Unrealized profit/loss |
+| `RealizedPnL` | `rpl` | Realized profit/loss |
+| `ExcessLiquidity` | `el` | Excess liquidity |
+| `MarginValue` | `mv` | Margin value |
+
+### AccountList (`GET /iserver/accounts`)
+
+| Go Field | API Key | Description |
+|----------|---------|-------------|
+| `SelectedAcct` | `selectedAccount` | Currently selected account |
+
+### Position (`GET /portfolio/{accountId}/positions/{pageId}`)
+
+| Go Field | API Key | Description |
+|----------|---------|-------------|
+| `Qty` | `position` | Total position size |
+
+### LedgerEntry (`GET /portfolio/{accountId}/ledger`)
+
+| Go Field | API Key | Description |
+|----------|---------|-------------|
+| `FuturesPnL` | `futuresonlypnl` | Futures position PnL |
+| `FutureOptionValue` | `futureoptionmarketvalue` | Futures options market value |
+| `NetLiquidation` | `netliquidationvalue` | Net liquidation value |
+
+### HistoryResponse / HistoryBar (`GET /iserver/marketdata/history`)
+
+| Go Field | API Key | Description |
+|----------|---------|-------------|
+| `Bars` | `data` | Array of OHLCV bars |
+| `Open` | `o` | Bar open price |
+| `High` | `h` | Bar high price |
+| `Low` | `l` | Bar low price |
+| `Close` | `c` | Bar close price |
+| `Volume` | `v` | Bar volume |
+| `Time` | `t` | Epoch timestamp |
+
+### Snapshot (`GET /iserver/marketdata/snapshot`)
+
+| Go Field | API Key | Description |
+|----------|---------|-------------|
+| `ServerID` | `server_id` | Internal server identifier |
+| `UpdateTime` | `_updated` | Last update timestamp |
+
+### SessionStatus (`POST /iserver/auth/ssodh/init`, `POST /iserver/auth/status`)
+
+| Go Field | API Key | Description |
+|----------|---------|-------------|
+| `HardwareInfo` | `hardware_info` | Hardware info string |
 
 ## Development
 

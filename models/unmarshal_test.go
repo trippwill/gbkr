@@ -158,8 +158,8 @@ func TestPnLEntry_UnmarshalJSON(t *testing.T) {
 	if e.NetLiquidation != 50000.0 {
 		t.Errorf("NetLiquidation = %f", e.NetLiquidation)
 	}
-	if e.MarketValue != 75000 {
-		t.Errorf("MarketValue = %f", e.MarketValue)
+	if e.MarginValue != 75000 {
+		t.Errorf("MarginValue = %f", e.MarginValue)
 	}
 }
 

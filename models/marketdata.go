@@ -93,13 +93,13 @@ type SnapshotParams struct {
 	Fields []SnapshotField // Field codes to return
 }
 
-// Snapshot is one element of the response for GET /iserver/marketdata/snapshot.
+// Snapshot is one element of the response array for GET /iserver/marketdata/snapshot.
 // Metadata fields (ConID, ServerID, UpdateTime) are always populated.
-// Market data fields are accessed via Get.
+// Dynamic market data fields are accessed via Get.
 type Snapshot struct {
-	ConID      ConID
-	ServerID   string
-	UpdateTime int64
+	ConID      ConID  // Contract identifier.
+	ServerID   string // Internal server ID. (API: "server_id")
+	UpdateTime int64  // Last update epoch timestamp. (API: "_updated")
 	fields     map[SnapshotField]json.RawMessage
 }
 
@@ -167,19 +167,19 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 
 // Quote is a strongly-typed projection of a Snapshot using FieldsQuote.
 type Quote struct {
-	Symbol      string
-	CompanyName string
-	Last        string
-	Bid         float64
-	Ask         float64
-	High        float64
-	Low         float64
-	Open        float64
-	Close       float64
-	PriorClose  float64
-	Volume      float64
-	Change      float64
-	ChangePct   float64
+	Symbol      string  // Ticker symbol.
+	CompanyName string  // Company or instrument name.
+	Last        string  // Last traded price (string; may contain formatting).
+	Bid         float64 // Current bid price.
+	Ask         float64 // Current ask price.
+	High        float64 // Day high.
+	Low         float64 // Day low.
+	Open        float64 // Day open.
+	Close       float64 // Day close.
+	PriorClose  float64 // Previous session close.
+	Volume      float64 // Day volume.
+	Change      float64 // Absolute price change.
+	ChangePct   float64 // Percentage price change.
 }
 
 // AsQuote projects the snapshot into a Quote struct.
@@ -204,12 +204,12 @@ func (s Snapshot) AsQuote() (Quote, bool) {
 
 // Greeks is a strongly-typed projection of a Snapshot using FieldsGreeks.
 type Greeks struct {
-	Delta      float64
-	Gamma      float64
-	Theta      float64
-	Vega       float64
-	ImpliedVol float64
-	OptIV      float64 // Implied vol from underlying (30-day)
+	Delta      float64 // Rate of change of option price vs underlying.
+	Gamma      float64 // Rate of change of delta.
+	Theta      float64 // Time decay per day.
+	Vega       float64 // Sensitivity to implied volatility.
+	ImpliedVol float64 // Option implied volatility.
+	OptIV      float64 // Implied vol from underlying (30-day).
 }
 
 // AsGreeks projects the snapshot into a Greeks struct.
@@ -227,13 +227,13 @@ func (s Snapshot) AsGreeks() (Greeks, bool) {
 
 // PnLSnapshot is a strongly-typed projection of a Snapshot using FieldsPnL.
 type PnLSnapshot struct {
-	MarketValue      float64
-	AvgPrice         float64
-	UnrealizedPnL    float64
-	UnrealizedPnLPct float64
-	RealizedPnL      float64
-	DailyPnL         float64
-	CostBasis        float64
+	MarketValue      float64 // Current market value of the position.
+	AvgPrice         float64 // Average entry price.
+	UnrealizedPnL    float64 // Unrealized profit/loss.
+	UnrealizedPnLPct float64 // Unrealized P&L as a percentage.
+	RealizedPnL      float64 // Realized profit/loss.
+	DailyPnL         float64 // Day profit/loss.
+	CostBasis        float64 // Total cost basis.
 }
 
 // AsPnL projects the snapshot into a PnLSnapshot struct.
@@ -252,14 +252,14 @@ func (s Snapshot) AsPnL() (PnLSnapshot, bool) {
 
 // BondSnapshot is a strongly-typed projection of a Snapshot using FieldsBond.
 type BondSnapshot struct {
-	LastYield       float64
-	BidYield        float64
-	AskYield        float64
-	Ratings         string
-	BondType        string
-	DebtClass       string
-	IssueDate       string
-	LastTradingDate string
+	LastYield       float64 // Last yield value.
+	BidYield        float64 // Bid yield value.
+	AskYield        float64 // Ask yield value.
+	Ratings         string  // Credit ratings.
+	BondType        string  // Bond type classification.
+	DebtClass       string  // Debt class (e.g. senior, subordinated).
+	IssueDate       string  // Bond issue date.
+	LastTradingDate string  // Last trading date for the bond.
 }
 
 // AsBond projects the snapshot into a BondSnapshot struct.
@@ -279,18 +279,18 @@ func (s Snapshot) AsBond() (BondSnapshot, bool) {
 
 // HistoryParams are query parameters for GET /iserver/marketdata/history.
 type HistoryParams struct {
-	ConID    ConID      // Contract ID
-	Period   TimePeriod // Time period (e.g., Period(1, PeriodDays))
-	Bar      BarSize    // Bar size (e.g., Bar(5, BarMinutes))
-	Exchange Exchange   // Optional exchange
+	ConID    ConID      // Contract ID.
+	Period   TimePeriod // Duration of the request (e.g., Period(1, PeriodDays)).
+	Bar      BarSize    // Bar size (e.g., Bar(5, BarMinutes)).
+	Exchange Exchange   // Optional exchange filter.
 }
 
 // HistoryResponse is the response for GET /iserver/marketdata/history.
 type HistoryResponse struct {
-	Symbol     string
-	Text       string
-	TimePeriod string
-	Bars       []HistoryBar
+	Symbol     string       // Ticker symbol.
+	Text       string       // Long name (e.g. "APPLE INC").
+	TimePeriod string       // Duration of the request.
+	Bars       []HistoryBar // OHLCV bar data. (API: "data")
 }
 
 func (h *HistoryResponse) UnmarshalJSON(data []byte) error {
@@ -310,14 +310,14 @@ func (h *HistoryResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// HistoryBar represents a single OHLC bar.
+// HistoryBar represents a single OHLCV bar in a history response.
 type HistoryBar struct {
-	Open   float64
-	High   float64
-	Low    float64
-	Close  float64
-	Volume float64
-	Time   int64
+	Open   float64 // Open price. (API: "o")
+	High   float64 // High price. (API: "h")
+	Low    float64 // Low price. (API: "l")
+	Close  float64 // Close price. (API: "c")
+	Volume float64 // Volume. (API: "v")
+	Time   int64   // Epoch unix timestamp. (API: "t")
 }
 
 func (b *HistoryBar) UnmarshalJSON(data []byte) error {

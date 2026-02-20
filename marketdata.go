@@ -23,7 +23,8 @@ var requiredMarketDataPermissions = []Permission{
 	{AreaTrading, ResourceMarketData, ActionRead},
 }
 
-// MarketData returns a MarketDataReader if the client has the required permissions.
+// MarketData returns a [MarketDataReader] if the client has the required permissions.
+// Requires: trading.marketdata.read.
 func MarketData(c *Client) (MarketDataReader, error) {
 	if err := checkPermissions(c, requiredMarketDataPermissions...); err != nil {
 		return nil, err

@@ -22,7 +22,8 @@ var requiredAccountListerPermissions = []Permission{
 	{AreaTrading, ResourceAccounts, ActionRead},
 }
 
-// Accounts returns an AccountLister if the client has the required permissions.
+// Accounts returns an [AccountLister] if the client has the required permissions.
+// Requires: trading.accounts.read.
 func Accounts(c *Client) (AccountLister, error) {
 	if err := checkPermissions(c, requiredAccountListerPermissions...); err != nil {
 		return nil, err
@@ -68,7 +69,8 @@ var requiredAccountReaderPermissions = []Permission{
 	{AreaTrading, ResourceAccounts, ActionRead},
 }
 
-// Account returns an AccountReader scoped to the given account ID.
+// Account returns an [AccountReader] scoped to the given account ID.
+// Requires: trading.accounts.read.
 func Account(c *Client, accountID models.AccountID) (AccountReader, error) {
 	if err := checkPermissions(c, requiredAccountReaderPermissions...); err != nil {
 		return nil, err

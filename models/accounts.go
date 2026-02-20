@@ -4,9 +4,9 @@ import "encoding/json"
 
 // AccountList is the response for GET /iserver/accounts.
 type AccountList struct {
-	Accounts      []AccountID
-	SelectedAcct  AccountID
-	AllowFeatures AllowFeatures
+	Accounts      []AccountID   // Array of all accessible account IDs.
+	SelectedAcct  AccountID     // The currently selected account. (API: "selectedAccount")
+	AllowFeatures AllowFeatures // Feature flags for the account.
 }
 
 func (a *AccountList) UnmarshalJSON(data []byte) error {
@@ -33,11 +33,11 @@ func (a *AccountList) UnmarshalJSON(data []byte) error {
 
 // AllowFeatures describes feature flags for the account.
 type AllowFeatures struct {
-	AllowCrypto       bool
-	AllowFXConv       bool
-	AllowEventTrading bool
-	AllowTypeAhead    bool
-	AllowedAssetTypes string
+	AllowCrypto       bool   // Whether crypto currencies can be traded.
+	AllowFXConv       bool   // Whether currency conversion is allowed.
+	AllowEventTrading bool   // Whether Event Trader can be used.
+	AllowTypeAhead    bool   // Whether Type-Ahead support is available.
+	AllowedAssetTypes string // List of asset types the account can trade.
 }
 
 func (f *AllowFeatures) UnmarshalJSON(data []byte) error {
@@ -61,11 +61,11 @@ func (f *AllowFeatures) UnmarshalJSON(data []byte) error {
 
 // AccountSummary is the response for GET /iserver/account/{accountId}/summary.
 type AccountSummary struct {
-	AccountReady bool
-	AccountType  AccountType
-	AccountID    AccountID
-	Currency     Currency
-	Sections     map[string][]SummaryField `json:"-"`
+	AccountReady bool                      // Indicates if the account is ready. (API: "accountready")
+	AccountType  AccountType               // Account type classification. (API: "accounttype")
+	AccountID    AccountID                 // Account identifier. (API: "accountId")
+	Currency     Currency                  // Account base currency.
+	Sections     map[string][]SummaryField `json:"-"` // Dynamic sections with summary fields.
 }
 
 func (s *AccountSummary) UnmarshalJSON(data []byte) error {
@@ -87,12 +87,12 @@ func (s *AccountSummary) UnmarshalJSON(data []byte) error {
 
 // SummaryField represents a single field within an account summary section.
 type SummaryField struct {
-	Amount    float64
-	Currency  Currency
-	IsNull    bool
-	Severity  int
-	Timestamp int64
-	Value     string
+	Amount    float64  // Numeric amount.
+	Currency  Currency // Currency code.
+	IsNull    bool     // Whether the value is null.
+	Severity  int      // Severity level.
+	Timestamp int64    // Epoch timestamp.
+	Value     string   // Display value.
 }
 
 func (f *SummaryField) UnmarshalJSON(data []byte) error {
@@ -122,13 +122,16 @@ type PnLPartitioned struct {
 }
 
 // PnLEntry holds profit/loss data for a single account.
+//
+// Response for GET /iserver/account/pnl/partitioned (within the acctPnl map).
+// Several fields use abbreviated API names; friendly Go names are provided.
 type PnLEntry struct {
-	DailyPnL        float64
-	NetLiquidation  float64
-	UnrealizedPnL   float64
-	RealizedPnL     float64
-	ExcessLiquidity float64
-	MarketValue     float64
+	DailyPnL        float64 // API: "dpl" — daily profit/loss.
+	NetLiquidation  float64 // API: "nl" — net liquidity value.
+	UnrealizedPnL   float64 // API: "upl" — unrealized profit/loss.
+	RealizedPnL     float64 // API: "rpl" — realized profit/loss.
+	ExcessLiquidity float64 // API: "el" — excess liquidity.
+	MarginValue     float64 // API: "mv" — margin value.
 }
 
 func (e *PnLEntry) UnmarshalJSON(data []byte) error {
@@ -138,7 +141,7 @@ func (e *PnLEntry) UnmarshalJSON(data []byte) error {
 		UnrealizedPnL   *float64 `json:"upl,omitempty"`
 		RealizedPnL     *float64 `json:"rpl,omitempty"`
 		ExcessLiquidity *float64 `json:"el,omitempty"`
-		MarketValue     *float64 `json:"mv,omitempty"`
+		MarginValue     *float64 `json:"mv,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -148,6 +151,6 @@ func (e *PnLEntry) UnmarshalJSON(data []byte) error {
 	e.UnrealizedPnL = deref(raw.UnrealizedPnL)
 	e.RealizedPnL = deref(raw.RealizedPnL)
 	e.ExcessLiquidity = deref(raw.ExcessLiquidity)
-	e.MarketValue = deref(raw.MarketValue)
+	e.MarginValue = deref(raw.MarginValue)
 	return nil
 }

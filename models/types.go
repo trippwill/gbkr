@@ -39,21 +39,21 @@ func (a AssetClass) String() string { return string(a) }
 
 // Known asset class values from the IBKR API.
 const (
-	AssetBill   AssetClass = "BILL"
-	AssetBond   AssetClass = "BOND"
-	AssetCash   AssetClass = "CASH"
-	AssetCFD    AssetClass = "CFD"
-	AssetCombo  AssetClass = "COMB"
-	AssetFOP    AssetClass = "FOP"
-	AssetFund   AssetClass = "FUND"
-	AssetFuture AssetClass = "FUT"
-	AssetOption AssetClass = "OPT"
-	AssetSSF    AssetClass = "SSF"
-	AssetStock  AssetClass = "STK"
-	AssetWar    AssetClass = "WAR"
-	AssetMargin AssetClass = "MRGN"
-	AssetCLP    AssetClass = "CLP"
-	AssetCrypto AssetClass = "CRYPTO"
+	AssetBill   AssetClass = "BILL"   // Treasury bills
+	AssetBond   AssetClass = "BOND"   // Bonds
+	AssetCash   AssetClass = "CASH"   // Forex / cash
+	AssetCFD    AssetClass = "CFD"    // Contracts for difference
+	AssetCombo  AssetClass = "COMB"   // Combination / spread orders
+	AssetFOP    AssetClass = "FOP"    // Futures options
+	AssetFund   AssetClass = "FUND"   // Mutual funds
+	AssetFuture AssetClass = "FUT"    // Futures
+	AssetOption AssetClass = "OPT"    // Options
+	AssetSSF    AssetClass = "SSF"    // Single stock futures
+	AssetStock  AssetClass = "STK"    // Stocks
+	AssetWar    AssetClass = "WAR"    // Warrants
+	AssetMargin AssetClass = "MRGN"   // Margin
+	AssetCLP    AssetClass = "CLP"    // Certificate of limited partnership
+	AssetCrypto AssetClass = "CRYPTO" // Cryptocurrencies
 )
 
 // AccountType is an account classification (e.g., "INDIVIDUAL", "JOINT").

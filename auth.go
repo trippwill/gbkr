@@ -26,6 +26,7 @@ var requiredSessionPermissions = []Permission{
 }
 
 // Session returns a [SessionClient] if the client has the required permissions.
+// Requires: auth.session.read, auth.session.write.
 func Session(c *Client) (SessionClient, error) {
 	if err := checkPermissions(c, requiredSessionPermissions...); err != nil {
 		return nil, err

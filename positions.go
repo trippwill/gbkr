@@ -40,7 +40,8 @@ func newPositionReader(c *Client, accountID models.AccountID) (PositionReader, e
 	return &positionReader{c: c, accountID: accountID}, nil
 }
 
-// Positions returns a PositionReader scoped to the given account ID.
+// Positions returns a [PositionReader] scoped to the given account ID.
+// Requires: portfolio.positions.read.
 func Positions(c *Client, accountID models.AccountID) (PositionReader, error) {
 	return newPositionReader(c, accountID)
 }
