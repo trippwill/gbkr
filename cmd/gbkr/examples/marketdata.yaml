@@ -1,0 +1,12 @@
+# Read-only access to market data snapshots and history.
+# Includes auth session for login.
+permissions:
+  - area: auth
+    resource: session
+    action: read
+  - area: auth
+    resource: session
+    action: write
+  - area: trading
+    resource: marketdata
+    action: read

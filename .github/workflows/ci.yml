@@ -1,0 +1,20 @@
+name: CI
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main", "dev"]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise run ci
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage.out

@@ -1,0 +1,5 @@
+# Read-only access to all areas and resources.
+permissions:
+  - area: "*"
+    resource: "*"
+    action: read

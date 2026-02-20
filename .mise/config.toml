@@ -1,0 +1,80 @@
+#:tombi schema.strict = false
+
+[tools]
+go = "1.25.7"
+golangci-lint = "2.9.0"
+
+[env]
+GOCACHE = "{{config_root}}/.tmp/go-build"
+GOMODCACHE = "{{config_root}}/.tmp/go-mod"
+
+[tasks.updeps]
+description = "Update all dependencies to their latest versions"
+confirm = """
+Are you sure you want to update all dependencies to their latest versions?
+This may introduce breaking changes.
+"""
+run = "go get -u ./..."
+depends_post = ["tidy"]
+
+[tasks.tidy]
+run = "go mod tidy"
+sources = ["go.mod", "**/*.go"]
+
+[tasks.fmt]
+depends = ["tidy"]
+run = "go fmt ./..."
+sources = ["**/*.go"]
+
+[tasks.fmt-check]
+depends = ["tidy"]
+run = """
+test -z "$(find . -name '*.go' -not -path './.tmp/*' | xargs gofmt -l)"
+"""
+
+[tasks.vet]
+wait_for = ["fmt"]
+run = "golangci-lint run ./..."
+
+[tasks.build-base]
+hide = true
+depends = ["tidy"]
+wait_for = ["fmt", "fmt-check", "vet"]
+run = "go build ./..."
+sources = ["**/*.go"]
+
+[tasks.build]
+depends = ["tidy", "vet", "build-base"]
+
+[tasks.build-ci]
+depends = ["tidy", "build-base"]
+
+[tasks.build-grant-all]
+description = "Build with gbkr_grant_all tag (includes GrantAllPrompter)"
+depends = ["tidy", "vet"]
+run = "go build -tags gbkr_grant_all ./..."
+
+# -count=1 to disable go test caching
+[tasks.test]
+wait_for = ["tidy", "vet"]
+run = "go test ./... -count=1"
+
+[tasks.test-race]
+wait_for = ["tidy", "vet"]
+run = "go test ./... -count=1 -race"
+
+[tasks.coverage]
+wait_for = ["tidy", "vet"]
+run = "go test ./... -coverprofile=coverage.out && go tool cover -html=coverage.out"
+
+[tasks.coverage-ci]
+wait_for = ["tidy", "vet"]
+run = "go test ./... -coverprofile=coverage.out -covermode=atomic"
+
+[tasks.ci]
+depends = ["fmt-check", "vet", "build-ci"]
+depends_post = ["coverage-ci"]
+
+[tasks.precommit]
+depends = ["fmt", "build"]
+depends_post = ["test-race"]

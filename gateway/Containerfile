@@ -1,0 +1,27 @@
+FROM eclipse-temurin:21-jre AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -sSL -o /tmp/clientportal.gw.zip \
+        https://download2.interactivebrokers.com/portal/clientportal.gw.zip \
+    && mkdir -p /opt/clientportal.gw \
+    && unzip /tmp/clientportal.gw.zip -d /opt/clientportal.gw \
+    && rm /tmp/clientportal.gw.zip
+
+FROM eclipse-temurin:21-jre
+
+RUN groupadd -r gateway && useradd -r -g gateway -d /opt/clientportal.gw gateway
+
+COPY --from=build --chown=gateway:gateway /opt/clientportal.gw /opt/clientportal.gw
+COPY --chown=gateway:gateway entrypoint.sh /opt/clientportal.gw/entrypoint.sh
+
+WORKDIR /opt/clientportal.gw
+
+EXPOSE 5000
+
+USER gateway
+
+ENTRYPOINT ["./entrypoint.sh", "root/conf.yaml"]

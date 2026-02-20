@@ -1,0 +1,8 @@
+# Read-only access to all areas and resources, plus auth write for login.
+permissions:
+  - area: "*"
+    resource: "*"
+    action: read
+  - area: auth
+    resource: session
+    action: write

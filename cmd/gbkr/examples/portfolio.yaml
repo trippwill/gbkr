@@ -1,0 +1,21 @@
+# Read-only access to portfolio positions and account ledger.
+# Includes auth session for login, and account listing for discovery.
+permissions:
+  - area: auth
+    resource: session
+    action: read
+  - area: auth
+    resource: session
+    action: write
+  - area: trading
+    resource: accounts
+    action: read
+  - area: portfolio
+    resource: positions
+    action: read
+  - area: portfolio
+    resource: summary
+    action: read
+  - area: portfolio
+    resource: ledger
+    action: read

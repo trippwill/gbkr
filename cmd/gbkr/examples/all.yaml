@@ -1,0 +1,5 @@
+# Unrestricted access to all areas, resources, and actions.
+permissions:
+  - area: "*"
+    resource: "*"
+    action: "*"
