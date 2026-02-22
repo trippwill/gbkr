@@ -4,10 +4,6 @@
 go = "1.25.7"
 golangci-lint = "2.9.0"
 
-[env]
-GOCACHE = "{{config_root}}/.tmp/go-build"
-GOMODCACHE = "{{config_root}}/.tmp/go-mod"
-
 [tasks.updeps]
 description = "Update all dependencies to their latest versions"
 confirm = """

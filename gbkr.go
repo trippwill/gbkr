@@ -11,16 +11,22 @@ import (
 	"sync"
 )
 
-// Client is the core IBKR API client. It holds transport configuration
-// and granted permissions but exposes no API methods directly.
-// Use capability constructors (Auth, Accounts, Positions, MarketData)
-// to obtain typed interfaces.
+// Client is the base IBKR API client. It holds transport configuration
+// and granted permissions. Provides read-only capabilities and session
+// elevation via [BrokerageSession].
 type Client struct {
 	baseURL     string
 	httpClient  *http.Client
 	permissions PermissionSet
 	prompter    Prompter
 	mu          sync.Mutex
+}
+
+// BrokerageClient provides capabilities requiring a brokerage session.
+// Embeds [*Client], inheriting all read-only capabilities.
+// Obtained via [Client.BrokerageSession].
+type BrokerageClient struct {
+	*Client
 }
 
 // NewClient creates a new IBKR API client with the given options.

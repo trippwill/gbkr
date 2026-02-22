@@ -52,6 +52,8 @@ const (
 	ResourceSummary                        // Portfolio summaries
 	ResourceLedger                         // Account ledger
 	ResourceAllocation                     // Account allocations
+	ResourceTrades                         // Trade executions and transaction history
+	ResourceContracts                      // Contract details and search
 )
 
 var resourceNames = map[Resource]string{
@@ -62,6 +64,8 @@ var resourceNames = map[Resource]string{
 	ResourceSummary:    "summary",
 	ResourceLedger:     "ledger",
 	ResourceAllocation: "allocation",
+	ResourceTrades:     "trades",
+	ResourceContracts:  "contracts",
 }
 
 var resourcesByName = map[string]Resource{
@@ -72,6 +76,8 @@ var resourcesByName = map[string]Resource{
 	"summary":    ResourceSummary,
 	"ledger":     ResourceLedger,
 	"allocation": ResourceAllocation,
+	"trades":     ResourceTrades,
+	"contracts":  ResourceContracts,
 }
 
 func (r Resource) String() string {

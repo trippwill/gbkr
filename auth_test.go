@@ -11,7 +11,7 @@ import (
 	"github.com/trippwill/gbkr/models"
 )
 
-func TestSession_PermissionDenied(t *testing.T) {
+func TestSessionStatus_PermissionDenied(t *testing.T) {
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissions(PermissionSet{}),
@@ -20,13 +20,13 @@ func TestSession_PermissionDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = Session(c)
+	_, err = c.SessionStatus(context.Background())
 	if !errors.Is(err, ErrPermissionDenied) {
 		t.Errorf("expected ErrPermissionDenied, got %v", err)
 	}
 }
 
-func TestSession_InitBrokerageSession(t *testing.T) {
+func TestBrokerageSession_InitBrokerageSession(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/iserver/auth/ssodh/init" {
 			t.Errorf("path = %q, want /iserver/auth/ssodh/init", r.URL.Path)
@@ -47,25 +47,21 @@ func TestSession_InitBrokerageSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc, err := Session(c)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	compete := true
-	result, err := sc.InitBrokerageSession(context.Background(), &models.SSOInitRequest{Compete: &compete})
+	bc, err := c.BrokerageSession(context.Background(), &models.SSOInitRequest{Compete: &compete})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Authenticated {
-		t.Error("expected Authenticated=true")
+	if bc == nil {
+		t.Fatal("expected non-nil BrokerageClient")
 	}
-	if result.ServerName != "srv1" {
-		t.Errorf("ServerName = %q, want %q", result.ServerName, "srv1")
+	if bc.Client != c {
+		t.Error("expected BrokerageClient to embed the original Client")
 	}
 }
 
-func TestSession_SessionStatus(t *testing.T) {
+func TestSessionStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/iserver/auth/status" {
 			t.Errorf("path = %q, want /iserver/auth/status", r.URL.Path)
@@ -82,12 +78,8 @@ func TestSession_SessionStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc, err := Session(c)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	result, err := sc.SessionStatus(context.Background())
+	result, err := c.SessionStatus(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

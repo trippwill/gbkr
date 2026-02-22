@@ -36,26 +36,22 @@ func main() {
 	ctx := context.Background()
 
 	// Session: elevate to brokerage session
-	sess, err := gbkr.Session(client)
+	bc, err := client.BrokerageSession(ctx, &models.SSOInitRequest{})
 	if err != nil {
-		log.Fatalf("Session capability denied: %v", err)
+		log.Fatalf("Brokerage session denied: %v", err)
 	}
 
-	session, err := sess.InitBrokerageSession(ctx, &models.SSOInitRequest{})
-	if err != nil {
-		log.Fatalf("Error initializing SSO: %v", err)
-	}
-	fmt.Printf("Session Authenticated: %v\n", session.Authenticated)
-	fmt.Printf("Session Connected: %v\n", session.Connected)
-
-	status, err := sess.SessionStatus(ctx)
+	status, err := client.SessionStatus(ctx)
 	if err != nil {
 		log.Fatalf("Error getting auth status: %v", err)
 	}
+	fmt.Printf("Session Authenticated: %v\n", status.Authenticated)
+	fmt.Printf("Session Connected: %v\n", status.Connected)
+
 	fmt.Printf("Auth Status: %v\n", status.Authenticated)
 
 	// Accounts: discover available accounts
-	lister, err := gbkr.Accounts(client)
+	lister, err := bc.Accounts()
 	if err != nil {
 		if errors.Is(err, gbkr.ErrPermissionDenied) {
 			log.Fatalf("Accounts capability denied: %v", err)
@@ -76,7 +72,7 @@ func main() {
 
 	// Scope to the first account
 	acctID := accountList.Accounts[0]
-	reader, err := gbkr.Account(client, acctID)
+	reader, err := bc.Account(acctID)
 	if err != nil {
 		if errors.Is(err, gbkr.ErrPermissionDenied) {
 			log.Fatalf("Account reader denied: %v", err)
@@ -115,7 +111,7 @@ func main() {
 	}
 
 	// Market data
-	md, err := gbkr.MarketData(client)
+	md, err := bc.MarketData()
 	if err != nil {
 		if errors.Is(err, gbkr.ErrPermissionDenied) {
 			log.Fatalf("MarketData capability denied: %v", err)
@@ -140,6 +136,57 @@ func main() {
 			snap.Get(models.FieldAsk),
 			snap.Get(models.FieldVolume),
 		)
+	}
+
+	// Contracts: look up contract details
+	contracts, err := bc.Contracts()
+	if err != nil {
+		if errors.Is(err, gbkr.ErrPermissionDenied) {
+			log.Printf("Contracts capability denied: %v", err)
+		} else {
+			log.Printf("Error creating Contracts capability: %v", err)
+		}
+	} else if len(conIDs) > 0 {
+		details, err := contracts.Info(ctx, conIDs[0])
+		if err != nil {
+			log.Printf("Error getting contract info: %v", err)
+		} else {
+			fmt.Printf("Contract: conid=%d symbol=%s\n", details.ConID, details.Symbol)
+		}
+	}
+
+	// Trades: recent trade executions (brokerage session)
+	trades, err := bc.Trades()
+	if err != nil {
+		if errors.Is(err, gbkr.ErrPermissionDenied) {
+			log.Printf("Trades capability denied: %v", err)
+		} else {
+			log.Printf("Error creating Trades capability: %v", err)
+		}
+	} else {
+		recent, err := trades.RecentTrades(ctx, 1)
+		if err != nil {
+			log.Printf("Error getting recent trades: %v", err)
+		} else {
+			fmt.Printf("Recent trades: %d\n", len(recent))
+		}
+	}
+
+	// Transaction history: read-only (no brokerage session required)
+	txn, err := client.TransactionHistory()
+	if err != nil {
+		if errors.Is(err, gbkr.ErrPermissionDenied) {
+			log.Printf("TransactionHistory capability denied: %v", err)
+		} else {
+			log.Printf("Error creating TransactionHistory capability: %v", err)
+		}
+	} else if len(accountList.Accounts) > 0 && len(conIDs) > 0 {
+		hist, err := txn.TransactionHistory(ctx, accountList.Accounts[0], conIDs[0], 7)
+		if err != nil {
+			log.Printf("Error getting transaction history: %v", err)
+		} else {
+			fmt.Printf("Transactions: %d\n", len(hist.Transactions))
+		}
 	}
 
 	fmt.Println("\nDone.")

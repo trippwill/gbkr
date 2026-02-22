@@ -25,11 +25,11 @@ var requiredMarketDataPermissions = []Permission{
 
 // MarketData returns a [MarketDataReader] if the client has the required permissions.
 // Requires: trading.marketdata.read.
-func MarketData(c *Client) (MarketDataReader, error) {
-	if err := checkPermissions(c, requiredMarketDataPermissions...); err != nil {
+func (bc *BrokerageClient) MarketData() (MarketDataReader, error) {
+	if err := checkPermissions(bc.Client, requiredMarketDataPermissions...); err != nil {
 		return nil, err
 	}
-	return &marketDataReader{c: c}, nil
+	return &marketDataReader{c: bc.Client}, nil
 }
 
 type marketDataReader struct {
