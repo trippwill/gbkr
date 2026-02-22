@@ -59,6 +59,19 @@ func TestTransactionHistory_CallsPAEndpoint(t *testing.T) {
 	}
 }
 
+func TestTrades_PermissionDenied(t *testing.T) {
+	c, err := NewClient(WithBaseURL("http://localhost"), WithPermissions(PermissionSet{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bc := &BrokerageClient{Client: c}
+
+	_, err = bc.Trades()
+	if !errors.Is(err, ErrPermissionDenied) {
+		t.Errorf("expected ErrPermissionDenied, got %v", err)
+	}
+}
+
 func TestTrades_RecentTrades(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/iserver/account/trades" {
