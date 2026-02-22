@@ -8,6 +8,6 @@ package gbkr
 type GrantAllPrompter struct{}
 
 // Prompt grants all missing permissions without user interaction.
-func (GrantAllPrompter) Prompt(missing []Permission) (PermissionSet, error) {
-	return PermissionSet(missing), nil
+func (GrantAllPrompter) Prompt(missing []Permission) ([]Permission, error) {
+	return missing, nil
 }

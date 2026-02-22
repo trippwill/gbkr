@@ -15,9 +15,8 @@ func TestErrorSentinels_Is(t *testing.T) {
 		{"ErrBaseURLRequired", ErrBaseURLRequired, ErrBaseURLRequired},
 		{"ErrPermissionDenied", ErrPermissionDenied, ErrPermissionDenied},
 		{"ErrAPIRequest", ErrAPIRequest, ErrAPIRequest},
-		{"ErrUnknownArea", ErrUnknownArea, ErrUnknownArea},
-		{"ErrUnknownResource", ErrUnknownResource, ErrUnknownResource},
-		{"ErrUnknownAction", ErrUnknownAction, ErrUnknownAction},
+		{"ErrUnknownLevel", ErrUnknownLevel, ErrUnknownLevel},
+		{"ErrUnknownScope", ErrUnknownScope, ErrUnknownScope},
 		{"ErrPermissionsFile", ErrPermissionsFile, ErrPermissionsFile},
 		{"ErrPermissionsDecode", ErrPermissionsDecode, ErrPermissionsDecode},
 		{"ErrPromptRead", ErrPromptRead, ErrPromptRead},
@@ -33,8 +32,8 @@ func TestErrorSentinels_Is(t *testing.T) {
 }
 
 func TestPermissionDeniedError(t *testing.T) {
-	required := []Permission{{AreaAuth, ResourceSession, ActionRead}}
-	missing := []Permission{{AreaAuth, ResourceSession, ActionRead}}
+	required := []Permission{{ScopeBrokerage, LevelRead}}
+	missing := []Permission{{ScopeBrokerage, LevelRead}}
 	err := ErrPermissionsDenied(required, missing)
 
 	if !errors.Is(err, ErrPermissionDenied) {
@@ -78,10 +77,10 @@ func TestAPIError(t *testing.T) {
 }
 
 func TestParseError(t *testing.T) {
-	err := ErrUnknownAreaValue("bogus")
+	err := ErrUnknownLevelValue("bogus")
 
-	if !errors.Is(err, ErrUnknownArea) {
-		t.Error("ParseError should wrap ErrUnknownArea")
+	if !errors.Is(err, ErrUnknownLevel) {
+		t.Error("ParseError should wrap ErrUnknownLevel")
 	}
 
 	var pe *ParseError
@@ -91,8 +90,8 @@ func TestParseError(t *testing.T) {
 	if pe.Value != "bogus" {
 		t.Errorf("Value = %q, want %q", pe.Value, "bogus")
 	}
-	if pe.Kind != ErrUnknownArea {
-		t.Errorf("Kind = %v, want %v", pe.Kind, ErrUnknownArea)
+	if pe.Kind != ErrUnknownLevel {
+		t.Errorf("Kind = %v, want %v", pe.Kind, ErrUnknownLevel)
 	}
 }
 
@@ -137,9 +136,9 @@ func TestErrorStrings(t *testing.T) {
 	})
 
 	t.Run("ParseError", func(t *testing.T) {
-		err := ErrUnknownResourceValue("xyz")
+		err := ErrUnknownLevelValue("xyz")
 		msg := err.Error()
-		if !contains(msg, "unknown resource") || !contains(msg, "xyz") {
+		if !contains(msg, "unknown level") || !contains(msg, "xyz") {
 			t.Errorf("ParseError.Error() = %q, want sentinel + value", msg)
 		}
 	})
@@ -154,8 +153,8 @@ func TestErrorStrings(t *testing.T) {
 
 	t.Run("PermissionDeniedError", func(t *testing.T) {
 		err := ErrPermissionsDenied(
-			[]Permission{{AreaAuth, ResourceSession, ActionRead}},
-			[]Permission{{AreaAuth, ResourceSession, ActionRead}},
+			[]Permission{{ScopeBrokerage, LevelRead}},
+			[]Permission{{ScopeBrokerage, LevelRead}},
 		)
 		msg := err.Error()
 		if !contains(msg, "permission denied") {

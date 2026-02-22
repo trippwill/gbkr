@@ -3,26 +3,12 @@ package gbkr
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/trippwill/gbkr/models"
 )
-
-func TestAccounts_PermissionDenied(t *testing.T) {
-	c, err := NewClient(WithBaseURL("http://localhost"), WithPermissions(PermissionSet{}), WithRateLimit(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	bc := &BrokerageClient{Client: c}
-
-	_, err = bc.Accounts()
-	if !errors.Is(err, ErrPermissionDenied) {
-		t.Errorf("expected ErrPermissionDenied, got %v", err)
-	}
-}
 
 func TestAccounts_ListAccounts(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,12 +23,12 @@ func TestAccounts_ListAccounts(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	bc := &BrokerageClient{Client: c}
-	al, _ := bc.Accounts()
+	al := bc.Accounts()
 
 	result, err := al.ListAccounts(context.Background())
 	if err != nil {
@@ -70,12 +56,12 @@ func TestAccounts_AccountPnL(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	bc := &BrokerageClient{Client: c}
-	al, _ := bc.Accounts()
+	al := bc.Accounts()
 
 	result, err := al.AccountPnL(context.Background())
 	if err != nil {
@@ -87,19 +73,6 @@ func TestAccounts_AccountPnL(t *testing.T) {
 	}
 	if entry.DailyPnL != 100.5 {
 		t.Errorf("DailyPnL = %f, want 100.5", entry.DailyPnL)
-	}
-}
-
-func TestAccount_PermissionDenied(t *testing.T) {
-	c, err := NewClient(WithBaseURL("http://localhost"), WithPermissions(PermissionSet{}), WithRateLimit(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	bc := &BrokerageClient{Client: c}
-
-	_, err = bc.Account("U1234567")
-	if !errors.Is(err, ErrPermissionDenied) {
-		t.Errorf("expected ErrPermissionDenied, got %v", err)
 	}
 }
 
@@ -118,12 +91,12 @@ func TestAccount_Summary(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	bc := &BrokerageClient{Client: c}
-	ar, _ := bc.Account("U1234567")
+	ar := bc.Account("U1234567")
 
 	if ar.AccountID() != "U1234567" {
 		t.Errorf("AccountID() = %q, want %q", ar.AccountID(), "U1234567")

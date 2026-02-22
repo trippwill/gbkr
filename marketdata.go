@@ -10,26 +10,23 @@ import (
 )
 
 // MarketDataReader provides read access to IBKR market data.
+// IBKR path prefix: /iserver/marketdata/*
+//
+// No per-method permission check — access is gated by [Client.BrokerageSession].
 type MarketDataReader interface {
-	// Snapshot returns a live market data snapshot (GET /iserver/marketdata/snapshot).
+	// Snapshot returns a live market data snapshot
+	// (GET /iserver/marketdata/snapshot).
 	Snapshot(ctx context.Context, params models.SnapshotParams) ([]models.Snapshot, error)
 
-	// History returns historical OHLC bar data (GET /iserver/marketdata/history).
+	// History returns historical OHLC bar data
+	// (GET /iserver/marketdata/history).
 	History(ctx context.Context, params models.HistoryParams) (*models.HistoryResponse, error)
 }
 
-// requiredMarketDataPermissions lists the permissions needed for MarketDataReader.
-var requiredMarketDataPermissions = []Permission{
-	{AreaTrading, ResourceMarketData, ActionRead},
-}
-
-// MarketData returns a [MarketDataReader] if the client has the required permissions.
-// Requires: trading.marketdata.read.
-func (bc *BrokerageClient) MarketData() (MarketDataReader, error) {
-	if err := checkPermissions(bc.Client, requiredMarketDataPermissions...); err != nil {
-		return nil, err
-	}
-	return &marketDataReader{c: bc.Client}, nil
+// MarketData returns a [MarketDataReader].
+// No per-method permission check — access is gated by [Client.BrokerageSession].
+func (bc *BrokerageClient) MarketData() MarketDataReader {
+	return &marketDataReader{c: bc.Client}
 }
 
 type marketDataReader struct {

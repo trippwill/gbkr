@@ -3,26 +3,12 @@ package gbkr
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/trippwill/gbkr/models"
 )
-
-func TestMarketData_PermissionDenied(t *testing.T) {
-	c, err := NewClient(WithBaseURL("http://localhost"), WithPermissions(PermissionSet{}), WithRateLimit(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bc := &BrokerageClient{Client: c}
-	_, err = bc.MarketData()
-	if !errors.Is(err, ErrPermissionDenied) {
-		t.Errorf("expected ErrPermissionDenied, got %v", err)
-	}
-}
 
 func TestMarketData_Snapshot(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,12 +34,12 @@ func TestMarketData_Snapshot(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	bc := &BrokerageClient{Client: c}
-	md, _ := bc.MarketData()
+	md := bc.MarketData()
 
 	params := models.SnapshotParams{
 		ConIDs: []models.ConID{265598},
@@ -107,12 +93,12 @@ func TestMarketData_History(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	bc := &BrokerageClient{Client: c}
-	md, _ := bc.MarketData()
+	md := bc.MarketData()
 
 	params := models.HistoryParams{
 		ConID:    265598,
