@@ -15,6 +15,7 @@ func TestSessionStatus_PermissionDenied(t *testing.T) {
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissions(PermissionSet{}),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +44,7 @@ func TestBrokerageSession_InitBrokerageSession(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +75,7 @@ func TestSessionStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}

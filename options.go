@@ -74,3 +74,26 @@ func WithPrompter(p Prompter) Option {
 func WithInteractivePrompt() Option {
 	return WithPrompter(InteractivePrompter{})
 }
+
+// WithRateLimit sets a custom [PacingPolicy] on the client. Pass nil
+// (or [NoPacing]) to disable pacing entirely.
+func WithRateLimit(policy *PacingPolicy) Option {
+	return func(c *Client) error {
+		if policy == nil {
+			c.pacingDisabled = true
+			c.pacing = nil
+		} else {
+			c.pacing = policy
+		}
+		return nil
+	}
+}
+
+// WithPacingObserver sets a [PacingObserver] that receives notifications
+// about pacing waits, cache hits, and cache misses.
+func WithPacingObserver(obs PacingObserver) Option {
+	return func(c *Client) error {
+		c.pacingObserver = obs
+		return nil
+	}
+}

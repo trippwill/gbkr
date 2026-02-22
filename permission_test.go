@@ -307,6 +307,7 @@ func TestCheckPermissions_Granted(t *testing.T) {
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissions(PermissionSet{{AreaAuth, ResourceSession, ActionRead}}),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -322,6 +323,7 @@ func TestCheckPermissions_Denied(t *testing.T) {
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissions(PermissionSet{}),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -350,6 +352,7 @@ func TestCheckPermissions_PrompterGrants(t *testing.T) {
 		WithBaseURL("http://localhost"),
 		WithPermissions(PermissionSet{}),
 		WithPrompter(&mockPrompter{grant: PermissionSet{needed}}),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -373,6 +376,7 @@ func TestCheckPermissions_PrompterPartialGrant(t *testing.T) {
 		WithPrompter(&mockPrompter{grant: PermissionSet{
 			{AreaAuth, ResourceSession, ActionRead},
 		}}),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -412,7 +416,7 @@ func TestReadOnly_GrantsClientReadMethods(t *testing.T) {
 	srv := permTestServer(t)
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +447,7 @@ func TestReadOnlyAuth_GrantsAllClientMethods(t *testing.T) {
 	srv := permTestServer(t)
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnlyAuth()))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnlyAuth()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,6 +495,7 @@ func TestReadOnlyAuth_PrompterNeverTriggered(t *testing.T) {
 		WithBaseURL(srv.URL),
 		WithPermissions(ReadOnlyAuth()),
 		WithPrompter(panicPrompter{}),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)

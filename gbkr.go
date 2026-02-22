@@ -15,11 +15,14 @@ import (
 // and granted permissions. Provides read-only capabilities and session
 // elevation via [BrokerageSession].
 type Client struct {
-	baseURL     string
-	httpClient  *http.Client
-	permissions PermissionSet
-	prompter    Prompter
-	mu          sync.Mutex
+	baseURL        string
+	httpClient     *http.Client
+	permissions    PermissionSet
+	prompter       Prompter
+	pacingObserver PacingObserver // staging field; attached to PacingPolicy during init
+	pacingDisabled bool           // set by WithRateLimit(nil) to suppress default init
+	pacing         *PacingPolicy
+	mu             sync.Mutex
 }
 
 // BrokerageClient provides capabilities requiring a brokerage session.
@@ -42,6 +45,16 @@ func NewClient(opts ...Option) (*Client, error) {
 	if c.baseURL == "" {
 		return nil, ErrBaseURLRequired
 	}
+
+	// Initialize pacing policy if not explicitly set by WithRateLimit.
+	if c.pacing == nil && !c.pacingDisabled {
+		c.pacing = newDefaultPacingPolicy()
+	}
+	if c.pacing != nil && c.pacingObserver != nil {
+		c.pacing.observer = c.pacingObserver
+	}
+	c.pacingObserver = nil // clear staging field
+
 	return c, nil
 }
 
@@ -86,6 +99,14 @@ func (c *Client) doPost(ctx context.Context, path string, body any, result any) 
 }
 
 func (c *Client) doRequest(req *http.Request, result any) error {
+	if c.pacing != nil {
+		path := req.URL.Path
+		if err := c.pacing.waitForSlot(req.Context(), req.Method, path); err != nil {
+			return err
+		}
+		defer c.pacing.releaseSlot(req.Method, path)
+	}
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)

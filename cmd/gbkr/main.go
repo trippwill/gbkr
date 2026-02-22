@@ -185,7 +185,7 @@ func main() {
 		if err != nil {
 			log.Printf("Error getting transaction history: %v", err)
 		} else {
-			fmt.Printf("Transactions: %d\n", len(hist.Transactions))
+			fmt.Printf("Transactions: %d\n", len(hist.Value.Transactions))
 		}
 	}
 
