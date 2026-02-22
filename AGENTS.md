@@ -46,7 +46,7 @@ auth.go              # SessionClient interface + Session(c) constructor
 accounts.go          # AccountLister + AccountReader interfaces + constructors
 positions.go         # PositionReader interface + Positions(c, id) constructor
 marketdata.go        # MarketDataReader interface + MarketData(c) constructor
-trades.go            # TradeReader interface + Trades(c) constructor
+trades.go            # TradeReader interface + BrokerageClient.Trades() method
 contracts.go         # ContractReader interface + Contracts(c) constructor
 example_test.go      # Go doc examples for capability constructors (package gbkr_test)
 models/
