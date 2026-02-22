@@ -39,7 +39,7 @@
 // If a request would exceed the limit, the client blocks until a slot is
 // available or the context is cancelled (returning [ErrPacingWait]).
 //
-// Pacing can be disabled for testing with [WithRateLimit](nil) or replaced
+// Pacing can be disabled for testing with WithRateLimit(nil) or replaced
 // with a custom [PacingPolicy] via [WithRateLimit]. An optional
 // [PacingObserver] (set via [WithPacingObserver]) receives notifications
 // about pacing waits and cache events.

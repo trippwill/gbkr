@@ -13,7 +13,7 @@ import (
 // T034: Test cache cold miss.
 func TestCache_ColdMiss(t *testing.T) {
 	c := &ttlCache[string]{ttl: time.Minute}
-	if got := c.get(); got != nil {
+	if got := c.get("k"); got != nil {
 		t.Errorf("expected nil on cold cache, got %v", got)
 	}
 }
@@ -21,8 +21,8 @@ func TestCache_ColdMiss(t *testing.T) {
 // T035: Test cache hit.
 func TestCache_Hit(t *testing.T) {
 	c := &ttlCache[string]{ttl: time.Minute}
-	stored := c.set("hello")
-	got := c.get()
+	stored := c.set("k1", "hello")
+	got := c.get("k1")
 	if got == nil {
 		t.Fatal("expected cache hit, got nil")
 	}
@@ -37,14 +37,37 @@ func TestCache_Hit(t *testing.T) {
 // T036: Test cache expiry.
 func TestCache_Expiry(t *testing.T) {
 	c := &ttlCache[string]{ttl: 50 * time.Millisecond}
-	c.set("ephemeral")
+	c.set("k", "ephemeral")
 	time.Sleep(60 * time.Millisecond)
-	if got := c.get(); got != nil {
+	if got := c.get("k"); got != nil {
 		t.Errorf("expected nil after TTL expiry, got %v", got)
 	}
 }
 
-// T037: Test fail-closed — stale data not returned after error.
+// Test cache miss when key changes (different request parameters).
+func TestCache_KeyMismatch(t *testing.T) {
+	c := &ttlCache[string]{ttl: time.Minute}
+	c.set("key-a", "value-a")
+
+	// Same key hits.
+	if got := c.get("key-a"); got == nil || got.Value != "value-a" {
+		t.Fatalf("expected hit for key-a, got %v", got)
+	}
+
+	// Different key misses.
+	if got := c.get("key-b"); got != nil {
+		t.Errorf("expected miss for key-b, got %v", got)
+	}
+
+	// After set with new key, old key misses.
+	c.set("key-b", "value-b")
+	if got := c.get("key-a"); got != nil {
+		t.Errorf("expected miss for key-a after key-b set, got %v", got)
+	}
+	if got := c.get("key-b"); got == nil || got.Value != "value-b" {
+		t.Fatalf("expected hit for key-b, got %v", got)
+	}
+}
 func TestCache_FailClosed(t *testing.T) {
 	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -133,7 +156,7 @@ func TestCache_Observer(t *testing.T) {
 	}
 
 	// Miss on cold cache.
-	c.get()
+	c.get("k")
 	obs.mu.Lock()
 	if len(obs.misses) != 1 || obs.misses[0] != "/test/cache" {
 		t.Errorf("expected 1 miss for /test/cache, got %v", obs.misses)
@@ -141,8 +164,8 @@ func TestCache_Observer(t *testing.T) {
 	obs.mu.Unlock()
 
 	// Set and hit.
-	c.set("value")
-	c.get()
+	c.set("k", "value")
+	c.get("k")
 	obs.mu.Lock()
 	if len(obs.hits) != 1 || obs.hits[0] != "/test/cache" {
 		t.Errorf("expected 1 hit for /test/cache, got %v", obs.hits)
@@ -154,7 +177,7 @@ func TestCache_Observer(t *testing.T) {
 func TestCache_FetchedAtAccuracy(t *testing.T) {
 	c := &ttlCache[int]{ttl: time.Minute}
 	before := time.Now()
-	stored := c.set(42)
+	stored := c.set("k", 42)
 	after := time.Now()
 
 	if stored.FetchedAt.Before(before) || stored.FetchedAt.After(after) {

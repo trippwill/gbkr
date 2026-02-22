@@ -53,6 +53,10 @@ func (t *tradeReader) RecentTrades(ctx context.Context, days int) ([]models.Trad
 
 // TransactionHistory returns a [TransactionReader] for querying Portfolio Analyst
 // transaction history. Requires: trading.trades.read.
+//
+// The returned reader caches results for 15 minutes (matching the IBKR pacing
+// limit). Callers should retain and reuse the reader rather than calling
+// TransactionHistory() repeatedly.
 func (c *Client) TransactionHistory() (TransactionReader, error) {
 	if err := checkPermissions(c, Permission{AreaTrading, ResourceTrades, ActionRead}); err != nil {
 		return nil, err
@@ -77,7 +81,8 @@ type transactionReader struct {
 }
 
 func (t *transactionReader) TransactionHistory(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*Cached[models.TransactionHistoryResponse], error) {
-	if cached := t.txCache.get(); cached != nil {
+	key := fmt.Sprintf("%s:%d:%d", accountID, conID, days)
+	if cached := t.txCache.get(key); cached != nil {
 		return cached, nil
 	}
 	req := models.TransactionHistoryRequest{
@@ -93,5 +98,5 @@ func (t *transactionReader) TransactionHistory(ctx context.Context, accountID mo
 		t.txCache.invalidate()
 		return nil, err
 	}
-	return t.txCache.set(result), nil
+	return t.txCache.set(key, result), nil
 }
