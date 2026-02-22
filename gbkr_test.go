@@ -16,6 +16,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (*Client, *httptest.S
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
 		WithPermissions(AllPermissions()),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		srv.Close()

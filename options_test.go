@@ -12,6 +12,7 @@ func TestWithHTTPClient(t *testing.T) {
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithHTTPClient(custom),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -37,6 +38,7 @@ permissions:
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissionsFromFile(path),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +54,7 @@ func TestWithPermissionsFromFile_Missing(t *testing.T) {
 	_, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissionsFromFile("/nonexistent/perms.yaml"),
+		WithRateLimit(nil),
 	)
 	if err == nil {
 		t.Fatal("expected error for missing file")
@@ -63,6 +66,7 @@ func TestWithPrompter(t *testing.T) {
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPrompter(p),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +81,7 @@ func TestClient_Permissions(t *testing.T) {
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissions(ps),
+		WithRateLimit(nil),
 	)
 	if err != nil {
 		t.Fatal(err)

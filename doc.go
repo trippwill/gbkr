@@ -24,4 +24,30 @@
 // [WithPermissionsFromFile], or JIT prompting with [WithInteractivePrompt].
 // Predefined sets [ReadOnly], [ReadOnlyAuth], and [AllPermissions] cover
 // common scenarios.
+//
+// # API Pacing
+//
+// By default, the client enforces the IBKR pacing limits automatically.
+// Every outbound request passes through [PacingPolicy], which applies:
+//
+//   - A global ceiling of 10 requests/second
+//   - Per-endpoint rate limits for sensitive paths (e.g., 1 req/5 s for
+//     /iserver/account/orders)
+//   - Concurrency semaphores where documented (e.g., 5 concurrent requests
+//     for /iserver/marketdata/history)
+//
+// If a request would exceed the limit, the client blocks until a slot is
+// available or the context is cancelled (returning [ErrPacingWait]).
+//
+// Pacing can be disabled for testing with [WithRateLimit](nil) or replaced
+// with a custom [PacingPolicy] via [WithRateLimit]. An optional
+// [PacingObserver] (set via [WithPacingObserver]) receives notifications
+// about pacing waits and cache events.
+//
+// # Data Freshness
+//
+// Endpoints with very long pacing intervals (e.g., /pa/transactions at
+// 1 req/15 min) return [Cached] values. The [Cached.FetchedAt] timestamp
+// lets consumers decide whether the data is fresh enough for their use case.
+// On cache refresh failure, stale data is discarded (fail-closed).
 package gbkr

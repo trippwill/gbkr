@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/trippwill/gbkr/models"
 )
@@ -18,7 +19,7 @@ type TradeReader interface {
 // TransactionReader provides read-only access to Portfolio Analyst
 // transaction history (POST /pa/transactions).
 type TransactionReader interface {
-	TransactionHistory(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*models.TransactionHistoryResponse, error)
+	TransactionHistory(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*Cached[models.TransactionHistoryResponse], error)
 }
 
 var requiredTradePermissions = []Permission{
@@ -56,14 +57,29 @@ func (c *Client) TransactionHistory() (TransactionReader, error) {
 	if err := checkPermissions(c, Permission{AreaTrading, ResourceTrades, ActionRead}); err != nil {
 		return nil, err
 	}
-	return &transactionReader{c: c}, nil
+	var obs PacingObserver
+	if c.pacing != nil {
+		obs = c.pacing.observer
+	}
+	return &transactionReader{
+		c: c,
+		txCache: &ttlCache[models.TransactionHistoryResponse]{
+			ttl:      15 * time.Minute,
+			observer: obs,
+			path:     "/pa/transactions",
+		},
+	}, nil
 }
 
 type transactionReader struct {
-	c *Client
+	c       *Client
+	txCache *ttlCache[models.TransactionHistoryResponse]
 }
 
-func (t *transactionReader) TransactionHistory(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*models.TransactionHistoryResponse, error) {
+func (t *transactionReader) TransactionHistory(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*Cached[models.TransactionHistoryResponse], error) {
+	if cached := t.txCache.get(); cached != nil {
+		return cached, nil
+	}
 	req := models.TransactionHistoryRequest{
 		AcctIDs:  []string{string(accountID)},
 		ConIDs:   []int{int(conID)},
@@ -74,7 +90,8 @@ func (t *transactionReader) TransactionHistory(ctx context.Context, accountID mo
 	}
 	var result models.TransactionHistoryResponse
 	if err := t.c.doPost(ctx, "/pa/transactions", req, &result); err != nil {
+		t.txCache.invalidate()
 		return nil, err
 	}
-	return &result, nil
+	return t.txCache.set(result), nil
 }
