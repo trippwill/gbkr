@@ -17,7 +17,8 @@ func TestMarketData_PermissionDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = MarketData(c)
+	bc := &BrokerageClient{Client: c}
+	_, err = bc.MarketData()
 	if !errors.Is(err, ErrPermissionDenied) {
 		t.Errorf("expected ErrPermissionDenied, got %v", err)
 	}
@@ -51,7 +52,8 @@ func TestMarketData_Snapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	md, _ := MarketData(c)
+	bc := &BrokerageClient{Client: c}
+	md, _ := bc.MarketData()
 
 	params := models.SnapshotParams{
 		ConIDs: []models.ConID{265598},
@@ -109,7 +111,8 @@ func TestMarketData_History(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	md, _ := MarketData(c)
+	bc := &BrokerageClient{Client: c}
+	md, _ := bc.MarketData()
 
 	params := models.HistoryParams{
 		ConID:    265598,

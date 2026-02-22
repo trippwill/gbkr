@@ -16,8 +16,9 @@ func TestAccounts_PermissionDenied(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	bc := &BrokerageClient{Client: c}
 
-	_, err = Accounts(c)
+	_, err = bc.Accounts()
 	if !errors.Is(err, ErrPermissionDenied) {
 		t.Errorf("expected ErrPermissionDenied, got %v", err)
 	}
@@ -40,7 +41,8 @@ func TestAccounts_ListAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	al, _ := Accounts(c)
+	bc := &BrokerageClient{Client: c}
+	al, _ := bc.Accounts()
 
 	result, err := al.ListAccounts(context.Background())
 	if err != nil {
@@ -72,7 +74,8 @@ func TestAccounts_AccountPnL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	al, _ := Accounts(c)
+	bc := &BrokerageClient{Client: c}
+	al, _ := bc.Accounts()
 
 	result, err := al.AccountPnL(context.Background())
 	if err != nil {
@@ -92,8 +95,9 @@ func TestAccount_PermissionDenied(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	bc := &BrokerageClient{Client: c}
 
-	_, err = Account(c, "U1234567")
+	_, err = bc.Account("U1234567")
 	if !errors.Is(err, ErrPermissionDenied) {
 		t.Errorf("expected ErrPermissionDenied, got %v", err)
 	}
@@ -118,7 +122,8 @@ func TestAccount_Summary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ar, _ := Account(c, "U1234567")
+	bc := &BrokerageClient{Client: c}
+	ar, _ := bc.Account("U1234567")
 
 	if ar.AccountID() != "U1234567" {
 		t.Errorf("AccountID() = %q, want %q", ar.AccountID(), "U1234567")

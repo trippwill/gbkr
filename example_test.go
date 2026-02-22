@@ -22,7 +22,7 @@ func ExampleNewClient() {
 	// Output: client created, permissions: 1
 }
 
-func ExampleSession() {
+func ExampleClient_SessionStatus() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
 		gbkr.WithPermissions(gbkr.ReadOnlyAuth()),
@@ -31,25 +31,24 @@ func ExampleSession() {
 		log.Fatal(err)
 	}
 
-	sc, err := gbkr.Session(client)
-	if err != nil {
-		log.Fatal(err)
-	}
-	_ = sc // use sc.InitBrokerageSession() or sc.SessionStatus()
-	fmt.Println("session client created")
-	// Output: session client created
+	_ = client // use client.SessionStatus(ctx) or client.BrokerageSession(ctx, req)
+	fmt.Println("client with session permissions created")
+	// Output: client with session permissions created
 }
 
-func ExampleAccounts() {
+func ExampleBrokerageClient_Accounts() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
+		gbkr.WithPermissions(gbkr.AllPermissions()),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
+	bc := &gbkr.BrokerageClient{Client: client}
 
-	accts, err := gbkr.Accounts(client)
+	accts, err := bc.Accounts()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,16 +57,19 @@ func ExampleAccounts() {
 	// Output: account lister created
 }
 
-func ExampleAccount() {
+func ExampleBrokerageClient_Account() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
+		gbkr.WithPermissions(gbkr.AllPermissions()),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
+	bc := &gbkr.BrokerageClient{Client: client}
 
-	reader, err := gbkr.Account(client, models.AccountID("U1234567"))
+	reader, err := bc.Account(models.AccountID("U1234567"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,7 +77,7 @@ func ExampleAccount() {
 	// Output: account reader for: U1234567
 }
 
-func ExamplePositions() {
+func ExampleClient_Positions() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
 		gbkr.WithPermissions(gbkr.AllPermissions()),
@@ -84,7 +86,7 @@ func ExamplePositions() {
 		log.Fatal(err)
 	}
 
-	pos, err := gbkr.Positions(client, models.AccountID("U1234567"))
+	pos, err := client.Positions(models.AccountID("U1234567"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,7 +94,84 @@ func ExamplePositions() {
 	// Output: position reader for: U1234567
 }
 
-func ExampleMarketData() {
+func ExampleBrokerageClient_MarketData() {
+	client, err := gbkr.NewClient(
+		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
+		gbkr.WithPermissions(gbkr.AllPermissions()),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
+	bc := &gbkr.BrokerageClient{Client: client}
+
+	md, err := bc.MarketData()
+	if err != nil {
+		log.Fatal(err)
+	}
+	_ = md // use md.Snapshot() or md.History()
+	fmt.Println("market data reader created")
+	// Output: market data reader created
+}
+
+func ExampleBrokerageClient_Contracts() {
+	client, err := gbkr.NewClient(
+		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
+		gbkr.WithPermissions(gbkr.AllPermissions()),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
+	bc := &gbkr.BrokerageClient{Client: client}
+
+	cr, err := bc.Contracts()
+	if err != nil {
+		log.Fatal(err)
+	}
+	_ = cr // use cr.Info() or cr.Search()
+	fmt.Println("contract reader created")
+	// Output: contract reader created
+}
+
+func ExampleBrokerageClient_Trades() {
+	client, err := gbkr.NewClient(
+		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
+		gbkr.WithPermissions(gbkr.AllPermissions()),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
+	bc := &gbkr.BrokerageClient{Client: client}
+
+	tr, err := bc.Trades()
+	if err != nil {
+		log.Fatal(err)
+	}
+	_ = tr // use tr.RecentTrades()
+	fmt.Println("trade reader created")
+	// Output: trade reader created
+}
+
+func ExampleClient_BrokerageSession() {
+	client, err := gbkr.NewClient(
+		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
+		gbkr.WithPermissions(gbkr.ReadOnlyAuth()),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_ = client // use client.BrokerageSession(ctx, req) to elevate
+	fmt.Println("client ready for elevation")
+	// Output: client ready for elevation
+}
+
+func ExampleClient_TransactionHistory() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
 		gbkr.WithPermissions(gbkr.ReadOnly()),
@@ -101,13 +180,13 @@ func ExampleMarketData() {
 		log.Fatal(err)
 	}
 
-	md, err := gbkr.MarketData(client)
+	txn, err := client.TransactionHistory()
 	if err != nil {
 		log.Fatal(err)
 	}
-	_ = md // use md.Snapshot() or md.History()
-	fmt.Println("market data reader created")
-	// Output: market data reader created
+	_ = txn // use txn.TransactionHistory(ctx, accountID, conID, days)
+	fmt.Println("transaction reader created")
+	// Output: transaction reader created
 }
 
 func ExampleNewClient_withPrompter() {
@@ -135,9 +214,9 @@ func ExampleNewClient_withPermissionsFile() {
 	// Output: permissions file option demonstrated
 }
 
-// ExampleAccount_positions demonstrates getting a PositionReader
+// ExampleBrokerageClient_Account_positions demonstrates getting a PositionReader
 // from an AccountReader, which checks portfolio permissions at that point.
-func ExampleAccount_positions() {
+func ExampleBrokerageClient_Account_positions() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
 		gbkr.WithPermissions(gbkr.AllPermissions()),
@@ -145,8 +224,11 @@ func ExampleAccount_positions() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
+	bc := &gbkr.BrokerageClient{Client: client}
 
-	acct, err := gbkr.Account(client, models.AccountID("U1234567"))
+	acct, err := bc.Account(models.AccountID("U1234567"))
 	if err != nil {
 		log.Fatal(err)
 	}

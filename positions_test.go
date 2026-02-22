@@ -15,7 +15,7 @@ func TestPositions_PermissionDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = Positions(c, "U1234567")
+	_, err = c.Positions("U1234567")
 	if !errors.Is(err, ErrPermissionDenied) {
 		t.Errorf("expected ErrPermissionDenied, got %v", err)
 	}
@@ -45,7 +45,7 @@ func TestPositions_ListPositions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := Positions(c, "U1234567")
+	pr, _ := c.Positions("U1234567")
 
 	if pr.AccountID() != "U1234567" {
 		t.Errorf("AccountID() = %q", pr.AccountID())
@@ -84,7 +84,7 @@ func TestPositions_SinglePosition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := Positions(c, "U1234567")
+	pr, _ := c.Positions("U1234567")
 
 	pos, err := pr.Position(context.Background(), 265598)
 	if err != nil {
@@ -114,7 +114,7 @@ func TestPositions_PortfolioSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := Positions(c, "U1234567")
+	pr, _ := c.Positions("U1234567")
 
 	summary, err := pr.PortfolioSummary(context.Background())
 	if err != nil {
@@ -153,7 +153,7 @@ func TestPositions_Ledger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := Positions(c, "U1234567")
+	pr, _ := c.Positions("U1234567")
 
 	ledger, err := pr.Ledger(context.Background())
 	if err != nil {
@@ -182,7 +182,8 @@ func TestAccountReader_Positions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ar, err := Account(c, "U1234567")
+	bc := &BrokerageClient{Client: c}
+	ar, err := bc.Account("U1234567")
 	if err != nil {
 		t.Fatal(err)
 	}

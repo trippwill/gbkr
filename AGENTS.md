@@ -46,6 +46,8 @@ auth.go              # SessionClient interface + Session(c) constructor
 accounts.go          # AccountLister + AccountReader interfaces + constructors
 positions.go         # PositionReader interface + Positions(c, id) constructor
 marketdata.go        # MarketDataReader interface + MarketData(c) constructor
+trades.go            # TradeReader interface + BrokerageClient.Trades() method
+contracts.go         # ContractReader interface + BrokerageClient.Contracts() method
 example_test.go      # Go doc examples for capability constructors (package gbkr_test)
 models/
   doc.go             # Package documentation
@@ -54,8 +56,10 @@ models/
   types_err.go       # Validation error sentinels and constructors for BarSize/TimePeriod
   auth.go            # SessionStatus, SSOInitRequest
   accounts.go        # AccountList, AccountSummary, PnLPartitioned
-  positions.go       # Position, PortfolioSummary, Ledger
+  positions.go       # Position (incl. option fields), PortfolioSummary, Ledger
   marketdata.go      # SnapshotParams, Snapshot, HistoryParams, HistoryResponse
+  trades.go          # TradeExecution, Transaction, TransactionHistoryRequest/Response
+  contracts.go       # ContractDetails, ContractSearchResult
 apispec/
   apispec.go         # Embedded OpenAPI spec (api-docs.json)
   api-docs.json      # IBKR Client Portal API specification

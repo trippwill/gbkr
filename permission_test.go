@@ -1,8 +1,13 @@
 package gbkr
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/trippwill/gbkr/models"
 )
 
 func TestPermission_Allows(t *testing.T) {
@@ -383,6 +388,122 @@ func TestCheckPermissions_PrompterPartialGrant(t *testing.T) {
 	}
 	if !errors.Is(err, ErrPermissionDenied) {
 		t.Errorf("expected ErrPermissionDenied, got %v", err)
+	}
+}
+
+// panicPrompter is a Prompter that panics if called, used to verify
+// that static permissions are sufficient and the Prompter is not invoked.
+type panicPrompter struct{}
+
+func (p panicPrompter) Prompt([]Permission) (PermissionSet, error) {
+	panic("Prompter must not be called: static permissions should be sufficient")
+}
+
+// permTestServer returns an httptest.Server that returns empty JSON for all requests.
+func permTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}")) //nolint:errcheck
+	}))
+}
+
+func TestReadOnly_GrantsClientReadMethods(t *testing.T) {
+	srv := permTestServer(t)
+	defer srv.Close()
+
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// SessionStatus requires auth.session.read — should succeed.
+	if _, err := c.SessionStatus(context.Background()); err != nil {
+		t.Errorf("SessionStatus() should succeed with ReadOnly: %v", err)
+	}
+
+	// Positions requires portfolio.positions.read — should succeed.
+	if _, err := c.Positions("U123"); err != nil {
+		t.Errorf("Positions() should succeed with ReadOnly: %v", err)
+	}
+
+	// TransactionHistory requires trading.trades.read — should succeed.
+	if _, err := c.TransactionHistory(); err != nil {
+		t.Errorf("TransactionHistory() should succeed with ReadOnly: %v", err)
+	}
+
+	// BrokerageSession requires auth.session.write — should be denied.
+	_, err = c.BrokerageSession(context.Background(), &models.SSOInitRequest{})
+	if !errors.Is(err, ErrPermissionDenied) {
+		t.Errorf("BrokerageSession() with ReadOnly should be denied, got %v", err)
+	}
+}
+
+func TestReadOnlyAuth_GrantsAllClientMethods(t *testing.T) {
+	srv := permTestServer(t)
+	defer srv.Close()
+
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnlyAuth()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// All read-only Client methods should succeed.
+	if _, err := c.SessionStatus(context.Background()); err != nil {
+		t.Errorf("SessionStatus() should succeed with ReadOnlyAuth: %v", err)
+	}
+	if _, err := c.Positions("U123"); err != nil {
+		t.Errorf("Positions() should succeed with ReadOnlyAuth: %v", err)
+	}
+	if _, err := c.TransactionHistory(); err != nil {
+		t.Errorf("TransactionHistory() should succeed with ReadOnlyAuth: %v", err)
+	}
+
+	// BrokerageSession requires auth.session.write — should succeed.
+	bc, err := c.BrokerageSession(context.Background(), &models.SSOInitRequest{})
+	if err != nil {
+		t.Fatalf("BrokerageSession() should succeed with ReadOnlyAuth: %v", err)
+	}
+
+	// Brokerage capabilities requiring read should succeed via inherited {0,0,ActionRead}.
+	if _, err := bc.Accounts(); err != nil {
+		t.Errorf("Accounts() should succeed after elevation with ReadOnlyAuth: %v", err)
+	}
+	if _, err := bc.Account("U123"); err != nil {
+		t.Errorf("Account() should succeed after elevation with ReadOnlyAuth: %v", err)
+	}
+	if _, err := bc.MarketData(); err != nil {
+		t.Errorf("MarketData() should succeed after elevation with ReadOnlyAuth: %v", err)
+	}
+	if _, err := bc.Contracts(); err != nil {
+		t.Errorf("Contracts() should succeed after elevation with ReadOnlyAuth: %v", err)
+	}
+	if _, err := bc.Trades(); err != nil {
+		t.Errorf("Trades() should succeed after elevation with ReadOnlyAuth: %v", err)
+	}
+}
+
+func TestReadOnlyAuth_PrompterNeverTriggered(t *testing.T) {
+	srv := permTestServer(t)
+	defer srv.Close()
+
+	c, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithPermissions(ReadOnlyAuth()),
+		WithPrompter(panicPrompter{}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// FR-010: BrokerageSession must not trigger the Prompter.
+	// If the Prompter is called, panicPrompter panics and the test fails.
+	bc, err := c.BrokerageSession(context.Background(), &models.SSOInitRequest{})
+	if err != nil {
+		t.Fatalf("BrokerageSession() should succeed without prompting: %v", err)
+	}
+	if bc == nil {
+		t.Fatal("expected non-nil BrokerageClient")
 	}
 }
 

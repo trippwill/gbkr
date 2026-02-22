@@ -24,11 +24,11 @@ var requiredAccountListerPermissions = []Permission{
 
 // Accounts returns an [AccountLister] if the client has the required permissions.
 // Requires: trading.accounts.read.
-func Accounts(c *Client) (AccountLister, error) {
-	if err := checkPermissions(c, requiredAccountListerPermissions...); err != nil {
+func (bc *BrokerageClient) Accounts() (AccountLister, error) {
+	if err := checkPermissions(bc.Client, requiredAccountListerPermissions...); err != nil {
 		return nil, err
 	}
-	return &accountLister{c: c}, nil
+	return &accountLister{c: bc.Client}, nil
 }
 
 type accountLister struct {
@@ -71,11 +71,11 @@ var requiredAccountReaderPermissions = []Permission{
 
 // Account returns an [AccountReader] scoped to the given account ID.
 // Requires: trading.accounts.read.
-func Account(c *Client, accountID models.AccountID) (AccountReader, error) {
-	if err := checkPermissions(c, requiredAccountReaderPermissions...); err != nil {
+func (bc *BrokerageClient) Account(accountID models.AccountID) (AccountReader, error) {
+	if err := checkPermissions(bc.Client, requiredAccountReaderPermissions...); err != nil {
 		return nil, err
 	}
-	return &accountReader{c: c, accountID: accountID}, nil
+	return &accountReader{c: bc.Client, accountID: accountID}, nil
 }
 
 type accountReader struct {

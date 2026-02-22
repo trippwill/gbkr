@@ -1,6 +1,10 @@
 package models
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+)
 
 // Position represents a single portfolio position returned by
 // GET /portfolio/{accountId}/positions/{pageId}.
@@ -31,23 +35,38 @@ type Position struct {
 	AssetClass AssetClass
 	// Ticker is the ticker symbol.
 	Ticker string
+	// Expiry is the contract expiry date (e.g., "20240119"). Empty for non-expiry instruments.
+	Expiry string
+	// PutOrCall indicates "P" (put) or "C" (call) for options. Empty for non-options.
+	PutOrCall string
+	// Strike is the option strike price. Zero for non-options.
+	Strike float64
+	// UndConID is the underlying contract ID for derivatives. Zero for stocks.
+	UndConID ConID
+	// Multiplier is the contract multiplier (e.g., 100 for equity options).
+	Multiplier float64
 }
 
 func (p *Position) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		AcctID        *string  `json:"acctId,omitempty"`
-		ConID         *int     `json:"conid,omitempty"`
-		ContractDesc  *string  `json:"contractDesc,omitempty"`
-		Position      *float64 `json:"position,omitempty"`
-		MktPrice      *float64 `json:"mktPrice,omitempty"`
-		MktValue      *float64 `json:"mktValue,omitempty"`
-		AvgCost       *float64 `json:"avgCost,omitempty"`
-		AvgPrice      *float64 `json:"avgPrice,omitempty"`
-		RealizedPnL   *float64 `json:"realizedPnl,omitempty"`
-		UnrealizedPnL *float64 `json:"unrealizedPnl,omitempty"`
-		Currency      *string  `json:"currency,omitempty"`
-		AssetClass    *string  `json:"assetClass,omitempty"`
-		Ticker        *string  `json:"ticker,omitempty"`
+		AcctID        *string          `json:"acctId,omitempty"`
+		ConID         *int             `json:"conid,omitempty"`
+		ContractDesc  *string          `json:"contractDesc,omitempty"`
+		Position      *float64         `json:"position,omitempty"`
+		MktPrice      *float64         `json:"mktPrice,omitempty"`
+		MktValue      *float64         `json:"mktValue,omitempty"`
+		AvgCost       *float64         `json:"avgCost,omitempty"`
+		AvgPrice      *float64         `json:"avgPrice,omitempty"`
+		RealizedPnL   *float64         `json:"realizedPnl,omitempty"`
+		UnrealizedPnL *float64         `json:"unrealizedPnl,omitempty"`
+		Currency      *string          `json:"currency,omitempty"`
+		AssetClass    *string          `json:"assetClass,omitempty"`
+		Ticker        *string          `json:"ticker,omitempty"`
+		Expiry        *string          `json:"expiry,omitempty"`
+		PutOrCall     *string          `json:"putOrCall,omitempty"`
+		Strike        *json.RawMessage `json:"strike,omitempty"`
+		UndConID      *int             `json:"undConid,omitempty"`
+		Multiplier    *json.RawMessage `json:"multiplier,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -65,7 +84,42 @@ func (p *Position) UnmarshalJSON(data []byte) error {
 	p.Currency = Currency(deref(raw.Currency))
 	p.AssetClass = AssetClass(deref(raw.AssetClass))
 	p.Ticker = deref(raw.Ticker)
+	p.Expiry = deref(raw.Expiry)
+	p.PutOrCall = deref(raw.PutOrCall)
+	strike, err := decodeFlexibleFloat(raw.Strike)
+	if err != nil {
+		return err
+	}
+	p.Strike = strike
+	p.UndConID = ConID(deref(raw.UndConID))
+	multiplier, err := decodeFlexibleFloat(raw.Multiplier)
+	if err != nil {
+		return err
+	}
+	p.Multiplier = multiplier
 	return nil
+}
+
+func decodeFlexibleFloat(raw *json.RawMessage) (float64, error) {
+	if raw == nil || len(*raw) == 0 {
+		return 0, nil
+	}
+	var f float64
+	if err := json.Unmarshal(*raw, &f); err == nil {
+		return f, nil
+	}
+	var s string
+	if err := json.Unmarshal(*raw, &s); err == nil {
+		if s == "" {
+			return 0, nil
+		}
+		parsed, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, err
+		}
+		return parsed, nil
+	}
+	return 0, fmt.Errorf("decode flexible float: unsupported JSON value %s", string(*raw))
 }
 
 // PortfolioSummary is the response for GET /portfolio/{accountId}/summary.
