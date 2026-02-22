@@ -44,6 +44,8 @@ func ExampleBrokerageClient_Accounts() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	accts, err := bc.Accounts()
@@ -63,6 +65,8 @@ func ExampleBrokerageClient_Account() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	reader, err := bc.Account(models.AccountID("U1234567"))
@@ -98,6 +102,8 @@ func ExampleBrokerageClient_MarketData() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	md, err := bc.MarketData()
@@ -117,6 +123,8 @@ func ExampleBrokerageClient_Contracts() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	cr, err := bc.Contracts()
@@ -136,6 +144,8 @@ func ExampleBrokerageClient_Trades() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	tr, err := bc.Trades()
@@ -214,6 +224,8 @@ func ExampleBrokerageClient_Account_positions() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// In production, use client.BrokerageSession(ctx, req) to obtain a BrokerageClient.
+	// Direct construction is used here because examples don't make real HTTP calls.
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	acct, err := bc.Account(models.AccountID("U1234567"))
