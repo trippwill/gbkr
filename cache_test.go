@@ -96,11 +96,11 @@ func TestCache_FailClosed(t *testing.T) {
 	ar := c.Analysis()
 
 	// Override the cache TTL to something short for the test.
-	axr := ar.(*analysisReader)
+	axr := ar
 	axr.txCache.ttl = 50 * time.Millisecond
 
 	// First call — populates cache.
-	result, err := ar.Transactions(context.Background(), "U1234567", 265598, 30)
+	result, err := axr.Transactions(context.Background(), "U1234567", 265598, 30)
 	if err != nil {
 		t.Fatalf("first call: %v", err)
 	}

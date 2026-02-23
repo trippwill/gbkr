@@ -51,6 +51,6 @@ func TestAnalysis_NoPermissionsRequired(t *testing.T) {
 	}
 	ar := c.Analysis()
 	if ar == nil {
-		t.Fatal("expected non-nil AnalysisReader")
+		t.Fatal("expected non-nil Analysis")
 	}
 }

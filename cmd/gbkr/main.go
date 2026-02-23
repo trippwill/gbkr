@@ -52,7 +52,7 @@ func main() {
 	// Accounts: discover available accounts
 	lister := bc.Accounts()
 
-	accountList, err := lister.ListAccounts(ctx)
+	accountList, err := lister.List(ctx)
 	if err != nil {
 		log.Fatalf("Error listing accounts: %v", err)
 	}
@@ -66,7 +66,7 @@ func main() {
 	// Scope to the first account
 	acctID := accountList.Accounts[0]
 	reader := bc.Account(acctID)
-	fmt.Printf("\nScoped to account: %s\n", reader.AccountID())
+	fmt.Printf("\nScoped to account: %s\n", reader.ID())
 
 	summary, err := reader.Summary(ctx)
 	if err != nil {
@@ -75,7 +75,7 @@ func main() {
 		fmt.Printf("Account ID: %s\n", summary.AccountID)
 	}
 
-	// Positions: obtained from PortfolioReader (gateway access)
+	// Positions: obtained from Portfolio (gateway access)
 	portfolio := client.Portfolio(acctID)
 
 	var conIDs []models.ConID
@@ -126,7 +126,7 @@ func main() {
 
 	// Trades: recent trade executions (brokerage session)
 	trades := bc.Trades()
-	recent, err := trades.RecentTrades(ctx, 1)
+	recent, err := trades.Recent(ctx, 1)
 	if err != nil {
 		log.Printf("Error getting recent trades: %v", err)
 	} else {

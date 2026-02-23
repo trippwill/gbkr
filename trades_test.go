@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestTrades_RecentTrades(t *testing.T) {
+func TestTrades_Recent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/iserver/account/trades" {
 			t.Errorf("path = %q, want /iserver/account/trades", r.URL.Path)
@@ -32,7 +32,7 @@ func TestTrades_RecentTrades(t *testing.T) {
 	bc := &BrokerageClient{Client: c}
 	tr := bc.Trades()
 
-	trades, err := tr.RecentTrades(context.Background(), 7)
+	trades, err := tr.Recent(context.Background(), 7)
 	if err != nil {
 		t.Fatal(err)
 	}

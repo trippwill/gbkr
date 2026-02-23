@@ -47,7 +47,7 @@ func ExampleBrokerageClient_Accounts() {
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	accts := bc.Accounts()
-	_ = accts // use accts.ListAccounts() or accts.AccountPnL()
+	_ = accts // use accts.List() or accts.PnL()
 	fmt.Println("account lister created")
 	// Output: account lister created
 }
@@ -65,7 +65,7 @@ func ExampleBrokerageClient_Account() {
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	reader := bc.Account(models.AccountID("U1234567"))
-	fmt.Println("account reader for:", reader.AccountID())
+	fmt.Println("account reader for:", reader.ID())
 	// Output: account reader for: U1234567
 }
 
@@ -79,7 +79,7 @@ func ExampleClient_Portfolio() {
 
 	// No permissions required — gateway access.
 	pr := client.Portfolio(models.AccountID("U1234567"))
-	fmt.Println("portfolio reader for:", pr.AccountID())
+	fmt.Println("portfolio reader for:", pr.ID())
 	// Output: portfolio reader for: U1234567
 }
 
@@ -165,7 +165,7 @@ func ExampleBrokerageClient_Trades() {
 	bc := &gbkr.BrokerageClient{Client: client}
 
 	tr := bc.Trades()
-	_ = tr // use tr.RecentTrades()
+	_ = tr // use tr.Recent()
 	fmt.Println("trade reader created")
 	// Output: trade reader created
 }

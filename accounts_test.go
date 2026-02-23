@@ -10,7 +10,7 @@ import (
 	"github.com/trippwill/gbkr/models"
 )
 
-func TestAccounts_ListAccounts(t *testing.T) {
+func TestAccounts_List(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/iserver/accounts" {
 			t.Errorf("path = %q", r.URL.Path)
@@ -30,7 +30,7 @@ func TestAccounts_ListAccounts(t *testing.T) {
 	bc := &BrokerageClient{Client: c}
 	al := bc.Accounts()
 
-	result, err := al.ListAccounts(context.Background())
+	result, err := al.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestAccounts_ListAccounts(t *testing.T) {
 	}
 }
 
-func TestAccounts_AccountPnL(t *testing.T) {
+func TestAccounts_PnL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/iserver/account/pnl/partitioned" {
 			t.Errorf("path = %q", r.URL.Path)
@@ -63,7 +63,7 @@ func TestAccounts_AccountPnL(t *testing.T) {
 	bc := &BrokerageClient{Client: c}
 	al := bc.Accounts()
 
-	result, err := al.AccountPnL(context.Background())
+	result, err := al.PnL(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,8 +98,8 @@ func TestAccount_Summary(t *testing.T) {
 	bc := &BrokerageClient{Client: c}
 	ar := bc.Account("U1234567")
 
-	if ar.AccountID() != "U1234567" {
-		t.Errorf("AccountID() = %q, want %q", ar.AccountID(), "U1234567")
+	if ar.ID() != "U1234567" {
+		t.Errorf("ID() = %q, want %q", ar.ID(), "U1234567")
 	}
 
 	result, err := ar.Summary(context.Background())

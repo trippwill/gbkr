@@ -17,18 +17,18 @@
 //     Because [BrokerageClient] embeds [*Client], all gateway capabilities
 //     remain available after elevation.
 //
-// # Interface-to-Path Mapping
+// # Capability-to-Path Mapping
 //
-//	Interface                  Access Point               IBKR Path Prefix
+//	Capability                 Access Point               IBKR Path Prefix
 //	─────────────────────────  ────────────────────────   ─────────────────────────
-//	PortfolioReader            Client.Portfolio()         /portfolio/{accountId}/*
-//	AnalysisReader             Client.Analysis()          /pa/*
-//	AccountLister              BrokerageClient.Accounts() /iserver/accounts
-//	AccountReader              BrokerageClient.Account()  /iserver/account/{id}/*
-//	MarketDataReader           BrokerageClient.MarketData() /iserver/marketdata/*
-//	ContractReader             BrokerageClient.Contracts() /iserver/contract/{conid}/*
-//	SecurityDefinitionReader   BrokerageClient.SecurityDefinitions() /iserver/secdef/*
-//	TradeReader                BrokerageClient.Trades()   /iserver/account/trades
+//	Portfolio                  Client.Portfolio()           /portfolio/{accountId}/*
+//	Analysis                   Client.Analysis()            /pa/*
+//	Accounts                   BrokerageClient.Accounts()   /iserver/accounts
+//	Account                    BrokerageClient.Account()    /iserver/account/{id}/*
+//	MarketData                 BrokerageClient.MarketData() /iserver/marketdata/*
+//	Contracts                  BrokerageClient.Contracts()  /iserver/contract/{conid}/*
+//	SecurityDefinitions        BrokerageClient.SecurityDefinitions() /iserver/secdef/*
+//	Trades                     BrokerageClient.Trades()     /iserver/account/trades
 //
 // # Permission Model
 //
