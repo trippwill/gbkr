@@ -39,42 +39,6 @@ func WithInsecureTLS() Option {
 	}
 }
 
-// WithPermissions sets a static permission set.
-func WithPermissions(ps PermissionSet) Option {
-	return func(c *Client) error {
-		c.permissions = ps
-		return nil
-	}
-}
-
-// WithPermissionsFromFile loads permissions from a YAML file.
-func WithPermissionsFromFile(path string) Option {
-	return func(c *Client) error {
-		ps, err := LoadPermissionsFromFile(path)
-		if err != nil {
-			return err
-		}
-		c.permissions = ps
-		return nil
-	}
-}
-
-// WithPrompter sets a [Prompter] for JIT permission granting. When a
-// capability constructor needs permissions not in the static set, the
-// prompter is called with the missing permissions.
-func WithPrompter(p Prompter) Option {
-	return func(c *Client) error {
-		c.prompter = p
-		return nil
-	}
-}
-
-// WithInteractivePrompt enables JIT permission prompting via stderr/stdin.
-// Convenience wrapper for WithPrompter with an [InteractivePrompter].
-func WithInteractivePrompt() Option {
-	return WithPrompter(InteractivePrompter{})
-}
-
 // WithRateLimit sets a custom [PacingPolicy] on the client. Pass nil
 // (or [NoPacing]) to disable pacing entirely.
 func WithRateLimit(policy *PacingPolicy) Option {

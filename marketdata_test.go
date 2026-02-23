@@ -34,7 +34,7 @@ func TestMarketData_Snapshot(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestMarketData_History(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}

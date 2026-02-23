@@ -10,15 +10,12 @@ import (
 
 // Portfolio provides read access to portfolio positions for a specific account.
 // IBKR path prefix: /portfolio/{accountId}/*
-//
-// Gateway access — no permission check required.
 type Portfolio struct {
 	c         *Client
 	accountID models.AccountID
 }
 
 // Portfolio returns a [*Portfolio] handle scoped to the given account ID.
-// Gateway access — no permission check required.
 func (c *Client) Portfolio(accountID models.AccountID) *Portfolio {
 	return &Portfolio{c: c, accountID: accountID}
 }

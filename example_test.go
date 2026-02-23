@@ -12,13 +12,13 @@ func ExampleNewClient() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
 		gbkr.WithInsecureTLS(),
-		gbkr.WithPermissions(gbkr.FullAccess()),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("client created, has brokerage:read:", client.Permissions().Has(gbkr.ScopeBrokerage, gbkr.LevelRead))
-	// Output: client created, has brokerage:read: true
+	_ = client
+	fmt.Println("client created")
+	// Output: client created
 }
 
 func ExampleClient_SessionStatus() {
@@ -29,7 +29,7 @@ func ExampleClient_SessionStatus() {
 		log.Fatal(err)
 	}
 
-	_ = client // use client.SessionStatus(ctx) — no permissions required
+	_ = client // use client.SessionStatus(ctx)
 	fmt.Println("client for session status created")
 	// Output: client for session status created
 }
@@ -37,7 +37,6 @@ func ExampleClient_SessionStatus() {
 func ExampleBrokerageClient_Accounts() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -55,7 +54,6 @@ func ExampleBrokerageClient_Accounts() {
 func ExampleBrokerageClient_Account() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -77,7 +75,6 @@ func ExampleClient_Portfolio() {
 		log.Fatal(err)
 	}
 
-	// No permissions required — gateway access.
 	pr := client.Portfolio(models.AccountID("U1234567"))
 	fmt.Println("portfolio reader for:", pr.ID())
 	// Output: portfolio reader for: U1234567
@@ -91,7 +88,6 @@ func ExampleClient_Analysis() {
 		log.Fatal(err)
 	}
 
-	// No permissions required — gateway access.
 	ar := client.Analysis()
 	_ = ar // use ar.Transactions(ctx, accountID, conID, days)
 	fmt.Println("analysis reader created")
@@ -101,7 +97,6 @@ func ExampleClient_Analysis() {
 func ExampleBrokerageClient_MarketData() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -119,7 +114,6 @@ func ExampleBrokerageClient_MarketData() {
 func ExampleBrokerageClient_Contracts() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -137,7 +131,6 @@ func ExampleBrokerageClient_Contracts() {
 func ExampleBrokerageClient_SecurityDefinitions() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -155,7 +148,6 @@ func ExampleBrokerageClient_SecurityDefinitions() {
 func ExampleBrokerageClient_Trades() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -173,7 +165,6 @@ func ExampleBrokerageClient_Trades() {
 func ExampleClient_BrokerageSession() {
 	client, err := gbkr.NewClient(
 		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -182,29 +173,4 @@ func ExampleClient_BrokerageSession() {
 	_ = client // use client.BrokerageSession(ctx, req) to elevate
 	fmt.Println("client ready for elevation")
 	// Output: client ready for elevation
-}
-
-func ExampleNewClient_withPrompter() {
-	client, err := gbkr.NewClient(
-		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissions(gbkr.ReadOnly()),
-		gbkr.WithInteractivePrompt(),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	_ = client
-	fmt.Println("client with interactive prompter created")
-	// Output: client with interactive prompter created
-}
-
-func ExampleNewClient_withPermissionsFile() {
-	_, err := gbkr.NewClient(
-		gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-		gbkr.WithPermissionsFromFile("permissions.yml"),
-	)
-	// This would fail without the file, but shows the pattern.
-	_ = err
-	fmt.Println("permissions file option demonstrated")
-	// Output: permissions file option demonstrated
 }

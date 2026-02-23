@@ -15,7 +15,6 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (*Client, *httptest.S
 	srv := httptest.NewServer(handler)
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(FullAccess()),
 		WithRateLimit(nil),
 	)
 	if err != nil {

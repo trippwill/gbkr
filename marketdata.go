@@ -11,14 +11,11 @@ import (
 
 // MarketData provides read access to IBKR market data.
 // IBKR path prefix: /iserver/marketdata/*
-//
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 type MarketData struct {
 	c *Client
 }
 
 // MarketData returns a [*MarketData] handle.
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 func (bc *BrokerageClient) MarketData() *MarketData {
 	return &MarketData{c: bc.Client}
 }

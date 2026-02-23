@@ -35,13 +35,8 @@ go fmt ./...                      # format code
 ```
 doc.go               # Package documentation
 gbkr.go              # Core Client struct, HTTP transport (doGet, doPost)
-gbkr_err.go          # Error type, sentinel errors, APIError, PermissionDeniedError
+gbkr_err.go          # Error type, sentinel errors, APIError
 options.go           # Functional options (WithBaseURL, WithHTTPClient, etc.)
-permission.go        # Area/Resource/Action enums, PermissionSet, enforcement
-permission_err.go    # Parse error sentinels and constructors
-permcfg.go           # YAML config loading, interactive permission prompt
-permcfg_err.go       # Config error sentinels and constructors
-permcfg_grant_all.go # GrantAllPrompter (build tag: gbkr_grant_all)
 auth.go              # SessionClient interface + Session(c) constructor
 accounts.go          # AccountLister + AccountReader interfaces + constructors
 positions.go         # PositionReader interface + Positions(c, id) constructor
@@ -69,19 +64,12 @@ cmd/
 gateway/             # Container config for local IBKR gateway (not a Go package)
 ```
 
-### Permission Model
+### Capability Separation
 
-Three-tier enums (`Area`, `Resource`, `Action`) using `iota+1`. Zero-value (0) acts as wildcard in `Permission.Allows()`.
-
-Capability constructors (`Session`, `Accounts`, `Account`, `Positions`, `MarketData`) check permissions at runtime and return narrow interfaces. Consumers only see methods on the interface they obtained.
-
-Default permissions are **empty** (fail-closed). Consumers must explicitly grant permissions via `WithPermissions()`, `WithPermissionsFromFile()`, or enable JIT prompting with `WithInteractivePrompt()`.
-
-A `Prompter` interface supports JIT permission grants — when a capability constructor needs missing permissions, the prompter asks the user (or auto-grants in testing). Static permissions serve as a floor; JIT can only add, never remove.
-
-### Dangerous Capabilities
-
-Trading and banking capabilities will live in separate subpackages (`gbkr/trading`, `gbkr/banking`) so they require explicit imports. See `BACKLOG.md` for details.
+There is no runtime permission system. Dangerous capabilities (trading, banking) will
+live in separate Go modules (`gbkr/trading`, `gbkr/banking`) within the same repository,
+each with their own `go.mod`. This makes the dependency visible in any consumer's `go.mod`.
+See ADR-006 for the rationale.
 
 ## Conventions
 
@@ -94,11 +82,11 @@ Trading and banking capabilities will live in separate subpackages (`gbkr/tradin
 
 ### Error Handling
 - Define `type Error string` as the base sentinel type in `gbkr_err.go`
-- Use `const` sentinels for errors callers check with `errors.Is` (e.g., `ErrPermissionDenied`)
-- Use struct types with `Unwrap()` for errors needing context (e.g., `ParseError`, `APIError`)
+- Use `const` sentinels for errors callers check with `errors.Is` (e.g., `ErrAPIRequest`)
+- Use struct types with `Unwrap()` for errors needing context (e.g., `APIError`)
 - Use `Err*()` constructor functions for ergonomic error creation
 - Use `fmt.Errorf("context: %w", err)` only for internal wrapping not inspected by callers
-- Callers check errors via `errors.Is(err, gbkr.ErrPermissionDenied)` or `errors.As(err, &apiErr)`
+- Callers check errors via `errors.Is(err, gbkr.ErrAPIRequest)` or `errors.As(err, &apiErr)`
 
 ### Naming Conventions
 - Avoid "Get" prefix for getters — use noun-like names (e.g., `Summary()` not `GetSummary()`)
@@ -121,4 +109,3 @@ Trading and banking capabilities will live in separate subpackages (`gbkr/tradin
 - Run `mise run precommit` before commits
 - Run `mise run ci` to validate changes match what GitHub Actions will run
 - Linting uses `golangci-lint` v2 (managed by mise); config in `.golangci.yml`
-- `GrantAllPrompter` is gated by `//go:build gbkr_grant_all` — only include in test builds
