@@ -9,31 +9,23 @@ import (
 	"github.com/trippwill/gbkr/models"
 )
 
-// MarketDataReader provides read access to IBKR market data.
+// MarketData provides read access to IBKR market data.
 // IBKR path prefix: /iserver/marketdata/*
 //
 // No per-method permission check — access is gated by [Client.BrokerageSession].
-type MarketDataReader interface {
-	// Snapshot returns a live market data snapshot
-	// (GET /iserver/marketdata/snapshot).
-	Snapshot(ctx context.Context, params models.SnapshotParams) ([]models.Snapshot, error)
-
-	// History returns historical OHLC bar data
-	// (GET /iserver/marketdata/history).
-	History(ctx context.Context, params models.HistoryParams) (*models.HistoryResponse, error)
-}
-
-// MarketData returns a [MarketDataReader].
-// No per-method permission check — access is gated by [Client.BrokerageSession].
-func (bc *BrokerageClient) MarketData() MarketDataReader {
-	return &marketDataReader{c: bc.Client}
-}
-
-type marketDataReader struct {
+type MarketData struct {
 	c *Client
 }
 
-func (m *marketDataReader) Snapshot(ctx context.Context, params models.SnapshotParams) ([]models.Snapshot, error) {
+// MarketData returns a [*MarketData] handle.
+// No per-method permission check — access is gated by [Client.BrokerageSession].
+func (bc *BrokerageClient) MarketData() *MarketData {
+	return &MarketData{c: bc.Client}
+}
+
+// Snapshot returns a live market data snapshot
+// (GET /iserver/marketdata/snapshot).
+func (m *MarketData) Snapshot(ctx context.Context, params models.SnapshotParams) ([]models.Snapshot, error) {
 	q := url.Values{}
 	if len(params.ConIDs) > 0 {
 		ids := make([]string, len(params.ConIDs))
@@ -57,7 +49,9 @@ func (m *marketDataReader) Snapshot(ctx context.Context, params models.SnapshotP
 	return result, nil
 }
 
-func (m *marketDataReader) History(ctx context.Context, params models.HistoryParams) (*models.HistoryResponse, error) {
+// History returns historical OHLC bar data
+// (GET /iserver/marketdata/history).
+func (m *MarketData) History(ctx context.Context, params models.HistoryParams) (*models.HistoryResponse, error) {
 	q := url.Values{}
 	q.Set("conid", fmt.Sprintf("%d", int(params.ConID)))
 	q.Set("period", params.Period.String())

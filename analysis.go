@@ -8,28 +8,27 @@ import (
 	"github.com/trippwill/gbkr/models"
 )
 
-// AnalysisReader provides read-only access to Portfolio Analyst data.
+// Analysis provides read-only access to Portfolio Analyst data.
 // IBKR path prefix: /pa/*
 //
 // Gateway access — no permission check required.
-type AnalysisReader interface {
-	// Transactions returns transaction history for an account and contract
-	// (POST /pa/transactions).
-	Transactions(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*Cached[models.TransactionHistoryResponse], error)
+type Analysis struct {
+	c       *Client
+	txCache *ttlCache[models.TransactionHistoryResponse]
 }
 
-// Analysis returns an [AnalysisReader] for querying Portfolio Analyst data.
+// Analysis returns an [*Analysis] handle for querying Portfolio Analyst data.
 // Gateway access — no permission check required.
 //
-// The returned reader caches results for 15 minutes (matching the IBKR pacing
-// limit). Callers should retain and reuse the reader rather than calling
+// The returned handle caches results for 15 minutes (matching the IBKR pacing
+// limit). Callers should retain and reuse the handle rather than calling
 // Analysis() repeatedly.
-func (c *Client) Analysis() AnalysisReader {
+func (c *Client) Analysis() *Analysis {
 	var obs PacingObserver
 	if c.pacing != nil {
 		obs = c.pacing.observer
 	}
-	return &analysisReader{
+	return &Analysis{
 		c: c,
 		txCache: &ttlCache[models.TransactionHistoryResponse]{
 			ttl:      15 * time.Minute,
@@ -39,12 +38,9 @@ func (c *Client) Analysis() AnalysisReader {
 	}
 }
 
-type analysisReader struct {
-	c       *Client
-	txCache *ttlCache[models.TransactionHistoryResponse]
-}
-
-func (a *analysisReader) Transactions(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*Cached[models.TransactionHistoryResponse], error) {
+// Transactions returns transaction history for an account and contract
+// (POST /pa/transactions).
+func (a *Analysis) Transactions(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*Cached[models.TransactionHistoryResponse], error) {
 	key := fmt.Sprintf("%s:%d:%d", accountID, conID, days)
 	if cached := a.txCache.get(key); cached != nil {
 		return cached, nil

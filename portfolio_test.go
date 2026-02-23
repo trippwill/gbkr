@@ -34,8 +34,8 @@ func TestPortfolio_Positions(t *testing.T) {
 	}
 	pr := c.Portfolio("U1234567")
 
-	if pr.AccountID() != "U1234567" {
-		t.Errorf("AccountID() = %q", pr.AccountID())
+	if pr.ID() != "U1234567" {
+		t.Errorf("ID() = %q", pr.ID())
 	}
 
 	positions, err := pr.Positions(context.Background(), 0)
@@ -166,6 +166,6 @@ func TestPortfolio_NoPermissionsRequired(t *testing.T) {
 	}
 	pr := c.Portfolio("U1234567")
 	if pr == nil {
-		t.Fatal("expected non-nil PortfolioReader")
+		t.Fatal("expected non-nil Portfolio")
 	}
 }
