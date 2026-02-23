@@ -19,16 +19,16 @@
 //
 // # Interface-to-Path Mapping
 //
-//	Interface                  Access Point         IBKR Path Prefix
-//	─────────────────────────  ──────────────────   ─────────────────────────
-//	PortfolioReader            Client.Portfolio()   /portfolio/{accountId}/*
-//	AnalysisReader             Client.Analysis()    /pa/*
-//	AccountLister              BrokerageClient      /iserver/accounts
-//	AccountReader              BrokerageClient      /iserver/account/{id}/*
-//	MarketDataReader           BrokerageClient      /iserver/marketdata/*
-//	ContractReader             BrokerageClient      /iserver/contract/{conid}/*
-//	SecurityDefinitionReader   BrokerageClient      /iserver/secdef/*
-//	TradeReader                BrokerageClient      /iserver/account/trades
+//	Interface                  Access Point               IBKR Path Prefix
+//	─────────────────────────  ────────────────────────   ─────────────────────────
+//	PortfolioReader            Client.Portfolio()         /portfolio/{accountId}/*
+//	AnalysisReader             Client.Analysis()          /pa/*
+//	AccountLister              BrokerageClient.Accounts() /iserver/accounts
+//	AccountReader              BrokerageClient.Account()  /iserver/account/{id}/*
+//	MarketDataReader           BrokerageClient.MarketData() /iserver/marketdata/*
+//	ContractReader             BrokerageClient.Contracts() /iserver/contract/{conid}/*
+//	SecurityDefinitionReader   BrokerageClient.SecurityDefinitions() /iserver/secdef/*
+//	TradeReader                BrokerageClient.Trades()   /iserver/account/trades
 //
 // # Permission Model
 //
