@@ -4,13 +4,12 @@ import "fmt"
 
 // Sentinel errors for permission parsing.
 const (
-	ErrUnknownArea     = Error("unknown area")
-	ErrUnknownResource = Error("unknown resource")
-	ErrUnknownAction   = Error("unknown action")
+	ErrUnknownLevel = Error("unknown level")
+	ErrUnknownScope = Error("unknown scope")
 )
 
 // ParseError is returned when a permission field string cannot be mapped
-// to a known enum value.
+// to a known value.
 type ParseError struct {
 	Kind  Error
 	Value string
@@ -22,17 +21,12 @@ func (e *ParseError) Error() string {
 
 func (e *ParseError) Unwrap() error { return e.Kind }
 
-// ErrUnknownAreaValue constructs a [ParseError] for an unrecognized area string.
-func ErrUnknownAreaValue(value string) error {
-	return &ParseError{Kind: ErrUnknownArea, Value: value}
+// ErrUnknownLevelValue constructs a [ParseError] for an unrecognized level string.
+func ErrUnknownLevelValue(value string) error {
+	return &ParseError{Kind: ErrUnknownLevel, Value: value}
 }
 
-// ErrUnknownResourceValue constructs a [ParseError] for an unrecognized resource string.
-func ErrUnknownResourceValue(value string) error {
-	return &ParseError{Kind: ErrUnknownResource, Value: value}
-}
-
-// ErrUnknownActionValue constructs a [ParseError] for an unrecognized action string.
-func ErrUnknownActionValue(value string) error {
-	return &ParseError{Kind: ErrUnknownAction, Value: value}
+// ErrUnknownScopeValue constructs a [ParseError] for an unrecognized scope string.
+func ErrUnknownScopeValue(value string) error {
+	return &ParseError{Kind: ErrUnknownScope, Value: value}
 }

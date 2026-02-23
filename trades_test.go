@@ -3,74 +3,10 @@ package gbkr
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
-
-func TestTransactionHistory_PermissionDenied(t *testing.T) {
-	c, err := NewClient(WithBaseURL("http://localhost"), WithPermissions(PermissionSet{}), WithRateLimit(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = c.TransactionHistory()
-	if !errors.Is(err, ErrPermissionDenied) {
-		t.Errorf("expected ErrPermissionDenied, got %v", err)
-	}
-}
-
-func TestTransactionHistory_CallsPAEndpoint(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/pa/transactions" {
-			t.Errorf("path = %q, want /pa/transactions", r.URL.Path)
-		}
-		if r.Method != http.MethodPost {
-			t.Errorf("method = %s, want POST", r.Method)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
-			"currency":         "USD",
-			"from":             1700000000,
-			"to":               1700100000,
-			"includesRealTime": true,
-			"transactions":     []map[string]any{},
-		})
-	}))
-	defer srv.Close()
-
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tr, err := c.TransactionHistory()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := tr.TransactionHistory(context.Background(), "U1234567", 265598, 30)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Value.Currency != "USD" {
-		t.Errorf("Currency = %q, want %q", result.Value.Currency, "USD")
-	}
-}
-
-func TestTrades_PermissionDenied(t *testing.T) {
-	c, err := NewClient(WithBaseURL("http://localhost"), WithPermissions(PermissionSet{}), WithRateLimit(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	bc := &BrokerageClient{Client: c}
-
-	_, err = bc.Trades()
-	if !errors.Is(err, ErrPermissionDenied) {
-		t.Errorf("expected ErrPermissionDenied, got %v", err)
-	}
-}
 
 func TestTrades_RecentTrades(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,16 +24,13 @@ func TestTrades_RecentTrades(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	bc := &BrokerageClient{Client: c}
-	tr, err := bc.Trades()
-	if err != nil {
-		t.Fatal(err)
-	}
+	tr := bc.Trades()
 
 	trades, err := tr.RecentTrades(context.Background(), 7)
 	if err != nil {

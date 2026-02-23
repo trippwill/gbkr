@@ -45,7 +45,7 @@ func TestPacing_PerPathRate(t *testing.T) {
 	policy := testPacingPolicy("/test/path", "GET", 100*time.Millisecond, 1)
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(AllPermissions()),
+		WithPermissions(FullAccess()),
 		WithRateLimit(policy),
 	)
 	if err != nil {
@@ -78,7 +78,7 @@ func TestPacing_GlobalCeiling(t *testing.T) {
 	}
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(AllPermissions()),
+		WithPermissions(FullAccess()),
 		WithRateLimit(policy),
 	)
 	if err != nil {
@@ -124,7 +124,7 @@ func TestPacing_ConcurrencySemaphore(t *testing.T) {
 	policy := testSemaphorePolicy("/iserver/marketdata/history", "GET", 2)
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(AllPermissions()),
+		WithPermissions(FullAccess()),
 		WithRateLimit(policy),
 	)
 	if err != nil {
@@ -162,7 +162,7 @@ func TestPacing_ContextCancellation(t *testing.T) {
 	policy := testPacingPolicy("/test", "GET", 10*time.Second, 1)
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(AllPermissions()),
+		WithPermissions(FullAccess()),
 		WithRateLimit(policy),
 	)
 	if err != nil {
@@ -227,7 +227,7 @@ func TestPacing_Observer(t *testing.T) {
 
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(AllPermissions()),
+		WithPermissions(FullAccess()),
 		WithRateLimit(policy),
 	)
 	if err != nil {
@@ -257,7 +257,7 @@ func TestPacing_WithRateLimitNil(t *testing.T) {
 
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(AllPermissions()),
+		WithPermissions(FullAccess()),
 		WithRateLimit(nil),
 	)
 	if err != nil {
@@ -294,7 +294,7 @@ func TestPacing_CustomPolicyOverridesDefaults(t *testing.T) {
 	}
 	c, err := NewClient(
 		WithBaseURL(srv.URL),
-		WithPermissions(AllPermissions()),
+		WithPermissions(FullAccess()),
 		WithRateLimit(customPolicy),
 	)
 	if err != nil {

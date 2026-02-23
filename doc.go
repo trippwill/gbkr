@@ -5,25 +5,40 @@
 // The package uses a two-tier client model that mirrors the IBKR gateway's
 // session lifecycle:
 //
-//  1. [Client] — created via [NewClient]. Provides read-only capabilities that
-//     work with the gateway's default session: [Client.SessionStatus],
-//     [Client.Positions], and [Client.TransactionHistory].
+//  1. [Client] — created via [NewClient]. Provides ungated gateway capabilities:
+//     [Client.SessionStatus], [Client.Portfolio], and [Client.Analysis].
 //
 //  2. [BrokerageClient] — obtained by calling [Client.BrokerageSession], which
 //     performs an SSO/DH handshake to elevate to a full brokerage session.
 //     Provides brokerage capabilities: [BrokerageClient.Accounts],
 //     [BrokerageClient.Account], [BrokerageClient.MarketData],
-//     [BrokerageClient.Contracts], and [BrokerageClient.Trades].
-//     Because [BrokerageClient] embeds [*Client], all read-only capabilities
+//     [BrokerageClient.Contracts], [BrokerageClient.SecurityDefinitions],
+//     and [BrokerageClient.Trades].
+//     Because [BrokerageClient] embeds [*Client], all gateway capabilities
 //     remain available after elevation.
+//
+// # Interface-to-Path Mapping
+//
+//	Interface                  Access Point               IBKR Path Prefix
+//	─────────────────────────  ────────────────────────   ─────────────────────────
+//	PortfolioReader            Client.Portfolio()         /portfolio/{accountId}/*
+//	AnalysisReader             Client.Analysis()          /pa/*
+//	AccountLister              BrokerageClient.Accounts() /iserver/accounts
+//	AccountReader              BrokerageClient.Account()  /iserver/account/{id}/*
+//	MarketDataReader           BrokerageClient.MarketData() /iserver/marketdata/*
+//	ContractReader             BrokerageClient.Contracts() /iserver/contract/{conid}/*
+//	SecurityDefinitionReader   BrokerageClient.SecurityDefinitions() /iserver/secdef/*
+//	TradeReader                BrokerageClient.Trades()   /iserver/account/trades
 //
 // # Permission Model
 //
-// A three-tier permission model (Area / Resource / Action) gates every
-// capability at runtime. Consumers grant permissions via [WithPermissions],
-// [WithPermissionsFromFile], or JIT prompting with [WithInteractivePrompt].
-// Predefined sets [ReadOnly], [ReadOnlyAuth], and [AllPermissions] cover
-// common scenarios.
+// A two-tier permission model (Scope:Level) gates brokerage session elevation.
+// Consumers grant permissions via [WithPermissions], [WithPermissionsFromFile],
+// or JIT prompting with [WithInteractivePrompt].
+// Predefined sets [ReadOnly] and [FullAccess] cover common scenarios.
+//
+// Gateway access ([Client.Portfolio], [Client.Analysis], [Client.SessionStatus])
+// requires no permissions. Only [Client.BrokerageSession] checks permissions.
 //
 // # API Pacing
 //

@@ -25,9 +25,8 @@ func TestWithHTTPClient(t *testing.T) {
 func TestWithPermissionsFromFile(t *testing.T) {
 	yaml := []byte(`
 permissions:
-  - area: auth
-    resource: session
-    action: read
+  - scope: brokerage
+    level: read
 `)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "perms.yaml")
@@ -44,9 +43,8 @@ permissions:
 		t.Fatal(err)
 	}
 
-	want := Permission{AreaAuth, ResourceSession, ActionRead}
-	if !c.Permissions().Allows(want) {
-		t.Errorf("expected permission %v to be allowed", want)
+	if !c.Permissions().Has(ScopeBrokerage, LevelRead) {
+		t.Error("expected brokerage:read to be granted")
 	}
 }
 
@@ -77,7 +75,7 @@ func TestWithPrompter(t *testing.T) {
 }
 
 func TestClient_Permissions(t *testing.T) {
-	ps := PermissionSet{{AreaAuth, ResourceSession, ActionRead}}
+	ps := PermissionSet{ScopeBrokerage: LevelRead}
 	c, err := NewClient(
 		WithBaseURL("http://localhost"),
 		WithPermissions(ps),
@@ -87,10 +85,7 @@ func TestClient_Permissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := c.Permissions()
-	if len(got) != 1 {
-		t.Fatalf("Permissions() len = %d, want 1", len(got))
-	}
-	if got[0] != ps[0] { //nolint:gosec // length checked above
-		t.Errorf("Permissions() = %v, want %v", got, ps)
+	if !got.Has(ScopeBrokerage, LevelRead) {
+		t.Error("Permissions() should grant brokerage:read")
 	}
 }

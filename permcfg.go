@@ -16,9 +16,8 @@ type permissionsConfig struct {
 }
 
 type permissionEntry struct {
-	Area     string `yaml:"area"`
-	Resource string `yaml:"resource"`
-	Action   string `yaml:"action"`
+	Scope string `yaml:"scope"`
+	Level string `yaml:"level"`
 }
 
 // LoadPermissionsFromFile reads a YAML permissions file and returns a PermissionSet.
@@ -38,21 +37,17 @@ func LoadPermissions(r io.Reader) (PermissionSet, error) {
 		return nil, ErrPermissionsDecoding(err)
 	}
 
-	ps := make(PermissionSet, 0, len(cfg.Permissions))
+	ps := make(PermissionSet, len(cfg.Permissions))
 	for _, e := range cfg.Permissions {
-		area, err := ParseArea(e.Area)
+		scope := Scope(e.Scope)
+		if scope != ScopeBrokerage {
+			return nil, ErrUnknownScopeValue(e.Scope)
+		}
+		level, err := ParseLevel(e.Level)
 		if err != nil {
 			return nil, err
 		}
-		resource, err := ParseResource(e.Resource)
-		if err != nil {
-			return nil, err
-		}
-		action, err := ParseAction(e.Action)
-		if err != nil {
-			return nil, err
-		}
-		ps = append(ps, Permission{Area: area, Resource: resource, Action: action})
+		ps.Grant(Permission{Scope: scope, Level: level})
 	}
 	return ps, nil
 }
@@ -62,12 +57,12 @@ func LoadPermissions(r io.Reader) (PermissionSet, error) {
 type InteractivePrompter struct{}
 
 // Prompt asks the user to grant each missing permission.
-func (InteractivePrompter) Prompt(missing []Permission) (PermissionSet, error) {
+func (InteractivePrompter) Prompt(missing []Permission) ([]Permission, error) {
 	reader := bufio.NewReader(os.Stdin)
-	var granted PermissionSet
+	var granted []Permission
 
 	for _, p := range missing {
-		fmt.Fprintf(os.Stderr, "Grant permission %s? [y/N] ", p)
+		fmt.Fprintf(os.Stderr, "Grant %s:%s access? [y/N] ", p.Scope, p.Level)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return nil, ErrPromptReading(err)

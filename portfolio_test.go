@@ -3,25 +3,12 @@ package gbkr
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-func TestPositions_PermissionDenied(t *testing.T) {
-	c, err := NewClient(WithBaseURL("http://localhost"), WithPermissions(PermissionSet{}), WithRateLimit(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = c.Positions("U1234567")
-	if !errors.Is(err, ErrPermissionDenied) {
-		t.Errorf("expected ErrPermissionDenied, got %v", err)
-	}
-}
-
-func TestPositions_ListPositions(t *testing.T) {
+func TestPortfolio_Positions(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/portfolio/U1234567/positions/0" {
 			t.Errorf("path = %q", r.URL.Path)
@@ -41,17 +28,17 @@ func TestPositions_ListPositions(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := c.Positions("U1234567")
+	pr := c.Portfolio("U1234567")
 
 	if pr.AccountID() != "U1234567" {
 		t.Errorf("AccountID() = %q", pr.AccountID())
 	}
 
-	positions, err := pr.ListPositions(context.Background(), 0)
+	positions, err := pr.Positions(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +53,7 @@ func TestPositions_ListPositions(t *testing.T) {
 	}
 }
 
-func TestPositions_SinglePosition(t *testing.T) {
+func TestPortfolio_SinglePosition(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/portfolio/U1234567/position/265598" {
 			t.Errorf("path = %q", r.URL.Path)
@@ -80,11 +67,11 @@ func TestPositions_SinglePosition(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := c.Positions("U1234567")
+	pr := c.Portfolio("U1234567")
 
 	pos, err := pr.Position(context.Background(), 265598)
 	if err != nil {
@@ -95,7 +82,7 @@ func TestPositions_SinglePosition(t *testing.T) {
 	}
 }
 
-func TestPositions_PortfolioSummary(t *testing.T) {
+func TestPortfolio_Summary(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/portfolio/U1234567/summary" {
 			t.Errorf("path = %q", r.URL.Path)
@@ -110,13 +97,13 @@ func TestPositions_PortfolioSummary(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := c.Positions("U1234567")
+	pr := c.Portfolio("U1234567")
 
-	summary, err := pr.PortfolioSummary(context.Background())
+	summary, err := pr.Summary(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +119,7 @@ func TestPositions_PortfolioSummary(t *testing.T) {
 	}
 }
 
-func TestPositions_Ledger(t *testing.T) {
+func TestPortfolio_Ledger(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/portfolio/U1234567/ledger" {
 			t.Errorf("path = %q", r.URL.Path)
@@ -149,11 +136,11 @@ func TestPositions_Ledger(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, _ := c.Positions("U1234567")
+	pr := c.Portfolio("U1234567")
 
 	ledger, err := pr.Ledger(context.Background())
 	if err != nil {
@@ -171,28 +158,14 @@ func TestPositions_Ledger(t *testing.T) {
 	}
 }
 
-func TestAccountReader_Positions(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]any{}) //nolint:errcheck
-	}))
-	defer srv.Close()
-
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+func TestPortfolio_NoPermissionsRequired(t *testing.T) {
+	// Portfolio is gateway access — no permissions needed.
+	c, err := NewClient(WithBaseURL("http://localhost"), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
-	bc := &BrokerageClient{Client: c}
-	ar, err := bc.Account("U1234567")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pr, err := ar.Positions()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if pr.AccountID() != "U1234567" {
-		t.Errorf("AccountID() = %q", pr.AccountID())
+	pr := c.Portfolio("U1234567")
+	if pr == nil {
+		t.Fatal("expected non-nil PortfolioReader")
 	}
 }

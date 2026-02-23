@@ -88,22 +88,19 @@ func TestCache_FailClosed(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(AllPermissions()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tr, err := c.TransactionHistory()
-	if err != nil {
-		t.Fatal(err)
-	}
+	ar := c.Analysis()
 
 	// Override the cache TTL to something short for the test.
-	txr := tr.(*transactionReader)
-	txr.txCache.ttl = 50 * time.Millisecond
+	axr := ar.(*analysisReader)
+	axr.txCache.ttl = 50 * time.Millisecond
 
 	// First call — populates cache.
-	result, err := tr.TransactionHistory(context.Background(), "U1234567", 265598, 30)
+	result, err := ar.Transactions(context.Background(), "U1234567", 265598, 30)
 	if err != nil {
 		t.Fatalf("first call: %v", err)
 	}
@@ -115,13 +112,13 @@ func TestCache_FailClosed(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 
 	// Second call — server returns 500, should get error.
-	_, err = tr.TransactionHistory(context.Background(), "U1234567", 265598, 30)
+	_, err = ar.Transactions(context.Background(), "U1234567", 265598, 30)
 	if err == nil {
 		t.Fatal("expected error on server 500")
 	}
 
 	// Third call — cache was invalidated, should try to fetch again (and fail).
-	_, err = tr.TransactionHistory(context.Background(), "U1234567", 265598, 30)
+	_, err = ar.Transactions(context.Background(), "U1234567", 265598, 30)
 	if err == nil {
 		t.Fatal("expected error on third call (stale data not returned)")
 	}

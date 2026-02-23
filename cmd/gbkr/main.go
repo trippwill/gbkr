@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -51,13 +50,7 @@ func main() {
 	fmt.Printf("Auth Status: %v\n", status.Authenticated)
 
 	// Accounts: discover available accounts
-	lister, err := bc.Accounts()
-	if err != nil {
-		if errors.Is(err, gbkr.ErrPermissionDenied) {
-			log.Fatalf("Accounts capability denied: %v", err)
-		}
-		log.Fatalf("Error creating Accounts capability: %v", err)
-	}
+	lister := bc.Accounts()
 
 	accountList, err := lister.ListAccounts(ctx)
 	if err != nil {
@@ -72,13 +65,7 @@ func main() {
 
 	// Scope to the first account
 	acctID := accountList.Accounts[0]
-	reader, err := bc.Account(acctID)
-	if err != nil {
-		if errors.Is(err, gbkr.ErrPermissionDenied) {
-			log.Fatalf("Account reader denied: %v", err)
-		}
-		log.Fatalf("Error creating account reader: %v", err)
-	}
+	reader := bc.Account(acctID)
 	fmt.Printf("\nScoped to account: %s\n", reader.AccountID())
 
 	summary, err := reader.Summary(ctx)
@@ -88,17 +75,11 @@ func main() {
 		fmt.Printf("Account ID: %s\n", summary.AccountID)
 	}
 
-	// Positions: obtained from the scoped account reader
-	positions, err := reader.Positions()
-	if err != nil {
-		if errors.Is(err, gbkr.ErrPermissionDenied) {
-			log.Fatalf("Positions capability denied: %v", err)
-		}
-		log.Fatalf("Error creating positions reader: %v", err)
-	}
+	// Positions: obtained from PortfolioReader (gateway access)
+	portfolio := client.Portfolio(acctID)
 
 	var conIDs []models.ConID
-	pos, err := positions.ListPositions(ctx, 0)
+	pos, err := portfolio.Positions(ctx, 0)
 	if err != nil {
 		log.Printf("Error getting positions: %v", err)
 	} else {
@@ -111,13 +92,7 @@ func main() {
 	}
 
 	// Market data
-	md, err := bc.MarketData()
-	if err != nil {
-		if errors.Is(err, gbkr.ErrPermissionDenied) {
-			log.Fatalf("MarketData capability denied: %v", err)
-		}
-		log.Fatalf("Error creating MarketData capability: %v", err)
-	}
+	md := bc.MarketData()
 	snapshots, err := md.Snapshot(ctx, models.SnapshotParams{
 		ConIDs: conIDs,
 		Fields: models.FieldsQuote,
@@ -139,14 +114,8 @@ func main() {
 	}
 
 	// Contracts: look up contract details
-	contracts, err := bc.Contracts()
-	if err != nil {
-		if errors.Is(err, gbkr.ErrPermissionDenied) {
-			log.Printf("Contracts capability denied: %v", err)
-		} else {
-			log.Printf("Error creating Contracts capability: %v", err)
-		}
-	} else if len(conIDs) > 0 {
+	contracts := bc.Contracts()
+	if len(conIDs) > 0 {
 		details, err := contracts.Info(ctx, conIDs[0])
 		if err != nil {
 			log.Printf("Error getting contract info: %v", err)
@@ -156,32 +125,18 @@ func main() {
 	}
 
 	// Trades: recent trade executions (brokerage session)
-	trades, err := bc.Trades()
+	trades := bc.Trades()
+	recent, err := trades.RecentTrades(ctx, 1)
 	if err != nil {
-		if errors.Is(err, gbkr.ErrPermissionDenied) {
-			log.Printf("Trades capability denied: %v", err)
-		} else {
-			log.Printf("Error creating Trades capability: %v", err)
-		}
+		log.Printf("Error getting recent trades: %v", err)
 	} else {
-		recent, err := trades.RecentTrades(ctx, 1)
-		if err != nil {
-			log.Printf("Error getting recent trades: %v", err)
-		} else {
-			fmt.Printf("Recent trades: %d\n", len(recent))
-		}
+		fmt.Printf("Recent trades: %d\n", len(recent))
 	}
 
-	// Transaction history: read-only (no brokerage session required)
-	txn, err := client.TransactionHistory()
-	if err != nil {
-		if errors.Is(err, gbkr.ErrPermissionDenied) {
-			log.Printf("TransactionHistory capability denied: %v", err)
-		} else {
-			log.Printf("Error creating TransactionHistory capability: %v", err)
-		}
-	} else if len(accountList.Accounts) > 0 && len(conIDs) > 0 {
-		hist, err := txn.TransactionHistory(ctx, accountList.Accounts[0], conIDs[0], 7)
+	// Analysis: transaction history (gateway access — no brokerage session required)
+	analysis := client.Analysis()
+	if len(accountList.Accounts) > 0 && len(conIDs) > 0 {
+		hist, err := analysis.Transactions(ctx, accountList.Accounts[0], conIDs[0], 7)
 		if err != nil {
 			log.Printf("Error getting transaction history: %v", err)
 		} else {
