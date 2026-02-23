@@ -22,7 +22,7 @@ type AccountLister interface {
 	AccountPnL(ctx context.Context) (*models.PnLPartitioned, error)
 }
 
-// Accounts returns an [AccountLister] if the client has the required permissions.
+// Accounts returns an [AccountLister] for querying accounts.
 // No per-method permission check — access is gated by [Client.BrokerageSession].
 func (bc *BrokerageClient) Accounts() AccountLister {
 	return &accountLister{c: bc.Client}
