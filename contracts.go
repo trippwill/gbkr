@@ -9,14 +9,11 @@ import (
 
 // Contracts provides read access to contract details.
 // IBKR path prefix: /iserver/contract/{conid}/*
-//
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 type Contracts struct {
 	c *Client
 }
 
 // Contracts returns a [*Contracts] handle for querying contract information.
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 func (bc *BrokerageClient) Contracts() *Contracts {
 	return &Contracts{c: bc.Client}
 }

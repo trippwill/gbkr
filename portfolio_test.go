@@ -158,8 +158,7 @@ func TestPortfolio_Ledger(t *testing.T) {
 	}
 }
 
-func TestPortfolio_NoPermissionsRequired(t *testing.T) {
-	// Portfolio is gateway access — no permissions needed.
+func TestPortfolio_GatewayAccess(t *testing.T) {
 	c, err := NewClient(WithBaseURL("http://localhost"), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)

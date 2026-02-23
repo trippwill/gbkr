@@ -1,15 +1,14 @@
 # gbkr
 
-A permission-gated Go client library for the [Interactive Brokers](https://www.interactivebrokers.com/) Client Portal Gateway REST API.
+A Go client library for the [Interactive Brokers](https://www.interactivebrokers.com/) Client Portal Gateway REST API.
 
 ## Features
 
-- **Narrow capability interfaces** — consumers only see the methods they're allowed to use (`SessionClient`, `AccountLister`, `AccountReader`, `PositionReader`, `MarketDataReader`)
-- **Three-tier permission model** — `Area.Resource.Action` enums with wildcard support, enforced at both compile time (interface types) and runtime (constructor checks)
-- **Fail-closed by default** — no permissions are granted unless explicitly configured
+- **Two-phase session model** — `Client` for gateway access, `BrokerageClient` for brokerage session capabilities
+- **Narrow capability interfaces** — consumers get purpose-built types (`AccountLister`, `AccountReader`, `PositionReader`, `MarketDataReader`, `ContractReader`, `TradeReader`)
+- **Automatic API pacing** — built-in rate limiting and concurrency control matching IBKR's documented limits
 - **Strongly-typed domain aliases** — `AccountID`, `ConID`, `Currency`, `BarSize`, `TimePeriod` prevent parameter confusion
-- **Flexible permission sources** — static sets, YAML config files, or interactive prompts
-- **Structured error model** — const sentinel errors with `errors.Is`/`errors.As` support and `Err*()` constructors for context-rich errors
+- **Structured error model** — const sentinel errors with `errors.Is`/`errors.As` support
 
 ## Install
 
@@ -28,24 +27,26 @@ import (
     "log"
 
     "github.com/trippwill/gbkr"
+    "github.com/trippwill/gbkr/models"
 )
 
 func main() {
     client, err := gbkr.NewClient(
         gbkr.WithBaseURL("https://localhost:5000/v1/api"),
         gbkr.WithInsecureTLS(),
-        gbkr.WithPermissions(gbkr.ReadOnlyAuth()),
     )
     if err != nil {
         log.Fatal(err)
     }
 
-    lister, err := gbkr.Accounts(client)
+    // Elevate to a brokerage session (SSO/DH handshake).
+    bc, err := client.BrokerageSession(context.Background(), &models.SSOInitRequest{})
     if err != nil {
-        log.Fatal(err) // permission denied
+        log.Fatal(err)
     }
 
-    accounts, err := lister.ListAccounts(context.Background())
+    // Use narrow capability interfaces.
+    accounts, err := bc.Accounts().List(context.Background())
     if err != nil {
         log.Fatal(err)
     }
@@ -53,61 +54,44 @@ func main() {
 }
 ```
 
-## Permissions
+## Session Model
 
-Permissions use three-tier enums (`Area`, `Resource`, `Action`). A zero value in any field acts as a wildcard.
+gbkr mirrors the IBKR gateway's two-phase session lifecycle:
 
-```go
-// Grant all read permissions + auth login
-gbkr.WithPermissions(gbkr.ReadOnlyAuth())
+| Tier | Type | How to get | Capabilities |
+|------|------|------------|--------------|
+| Gateway | `*Client` | `NewClient(opts...)` | `SessionStatus`, `Portfolio`, `Analysis` |
+| Brokerage | `*BrokerageClient` | `client.BrokerageSession(ctx, req)` | `Accounts`, `Account`, `MarketData`, `Contracts`, `SecurityDefinitions`, `Trades` + all gateway capabilities |
 
-// Grant specific permissions
-gbkr.WithPermissions(gbkr.PermissionSet{
-    {gbkr.AreaAuth, gbkr.ResourceSession, gbkr.ActionRead},
-    {gbkr.AreaTrading, gbkr.ResourceAccounts, gbkr.ActionRead},
-})
+### Capability-to-Path Mapping
 
-// Load from a YAML file
-gbkr.WithPermissionsFromFile("permissions.yaml")
+| Capability | Access Point | IBKR Path Prefix |
+|------------|-------------|-----------------|
+| Portfolio | `Client.Portfolio()` | `/portfolio/{accountId}/*` |
+| Analysis | `Client.Analysis()` | `/pa/*` |
+| Accounts | `BrokerageClient.Accounts()` | `/iserver/accounts` |
+| Account | `BrokerageClient.Account()` | `/iserver/account/{id}/*` |
+| MarketData | `BrokerageClient.MarketData()` | `/iserver/marketdata/*` |
+| Contracts | `BrokerageClient.Contracts()` | `/iserver/contract/{conid}/*` |
+| SecurityDefinitions | `BrokerageClient.SecurityDefinitions()` | `/iserver/secdef/*` |
+| Trades | `BrokerageClient.Trades()` | `/iserver/account/trades` |
 
-// JIT prompt — permissions are requested as needed, not upfront
-gbkr.WithInteractivePrompt()
-```
+## Capability Separation
 
-### JIT Permission Prompting
+gbkr currently provides read-only access to the IBKR API. Dangerous capabilities
+(trading, banking) will live in **separate Go modules** (`gbkr/trading`, `gbkr/banking`)
+so that consuming applications must explicitly import them — making the dependency
+visible in `go.mod`. See [ADR-006](https://github.com/trippwill/midwatch.work/blob/main/docs/decisions/006-structural-capability-separation.md) for rationale.
 
-Instead of granting all permissions upfront, use `WithInteractivePrompt()` to prompt the user for each permission as it's needed:
+## API Pacing
 
-```go
-client, _ := gbkr.NewClient(
-    gbkr.WithBaseURL("https://localhost:5000/v1/api"),
-    gbkr.WithInteractivePrompt(),
-)
+The client automatically enforces IBKR's pacing limits:
 
-// When Session(client) is called, the user sees:
-//   Grant auth.session.read? [y/N] y
-//   Grant auth.session.write? [y/N] y
-sess, _ := gbkr.Session(client)
-```
+- Global ceiling of 10 requests/second
+- Per-endpoint rate limits for sensitive paths
+- Concurrency semaphores where documented
 
-A permissions file can serve as a floor — JIT prompts only for anything missing:
-
-```go
-gbkr.WithPermissionsFromFile("perms.yaml"),  // pre-grant some
-gbkr.WithInteractivePrompt(),                 // prompt for the rest
-```
-
-YAML format:
-
-```yaml
-permissions:
-  - area: auth
-    resource: session
-    action: read
-  - area: trading
-    resource: "*"
-    action: read
-```
+Pacing can be disabled for testing with `WithRateLimit(nil)` or observed via `WithPacingObserver`.
 
 ## Error Handling
 
@@ -117,19 +101,14 @@ All domain errors are inspectable via standard Go error patterns:
 import "errors"
 
 // Check sentinel errors
-if errors.Is(err, gbkr.ErrPermissionDenied) {
-    // insufficient permissions
+if errors.Is(err, gbkr.ErrAPIRequest) {
+    // non-2xx API response
 }
 
 // Extract structured context
 var apiErr *gbkr.APIError
 if errors.As(err, &apiErr) {
     fmt.Println(apiErr.StatusCode, apiErr.Status)
-}
-
-var parseErr *gbkr.ParseError
-if errors.As(err, &parseErr) {
-    fmt.Println(parseErr.Kind, parseErr.Value) // e.g., "unknown area", "badvalue"
 }
 ```
 
@@ -138,11 +117,7 @@ if errors.As(err, &parseErr) {
 A test CLI is included for exercising the library:
 
 ```bash
-go run ./cmd/gbkr --base-url https://localhost:5000/v1/api --insecure
-# Prompts for each permission as needed (JIT)
-
-go run ./cmd/gbkr --permissions-file cmd/gbkr/examples/readonly.yaml --insecure
-# Uses file as floor; prompts only for anything missing
+go run ./cmd/gbkr --insecure
 ```
 
 ## Field Name Mapping

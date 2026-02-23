@@ -12,7 +12,6 @@ import (
 
 func main() {
 	baseURL := flag.String("base-url", "https://localhost:5000/v1/api", "IBKR API base URL")
-	permsFile := flag.String("permissions-file", "", "YAML permissions file (optional floor; JIT prompts for anything missing)")
 	insecure := flag.Bool("insecure", false, "Skip TLS verification")
 	flag.Parse()
 
@@ -22,10 +21,6 @@ func main() {
 	if *insecure {
 		opts = append(opts, gbkr.WithInsecureTLS())
 	}
-	if *permsFile != "" {
-		opts = append(opts, gbkr.WithPermissionsFromFile(*permsFile))
-	}
-	opts = append(opts, gbkr.WithInteractivePrompt())
 
 	client, err := gbkr.NewClient(opts...)
 	if err != nil {

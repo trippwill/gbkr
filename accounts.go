@@ -10,14 +10,11 @@ import (
 
 // Accounts provides discovery of IBKR accounts without scoping to a specific one.
 // IBKR path prefix: /iserver/accounts, /iserver/account/pnl/*
-//
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 type Accounts struct {
 	c *Client
 }
 
 // Accounts returns an [*Accounts] handle for querying accounts.
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 func (bc *BrokerageClient) Accounts() *Accounts {
 	return &Accounts{c: bc.Client}
 }
@@ -44,15 +41,12 @@ func (a *Accounts) PnL(ctx context.Context) (*models.PnLPartitioned, error) {
 
 // Account provides read access to a specific IBKR account.
 // IBKR path prefix: /iserver/account/{accountId}/*
-//
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 type Account struct {
 	c         *Client
 	accountID models.AccountID
 }
 
 // Account returns an [*Account] handle scoped to the given account ID.
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 func (bc *BrokerageClient) Account(accountID models.AccountID) *Account {
 	return &Account{c: bc.Client, accountID: accountID}
 }

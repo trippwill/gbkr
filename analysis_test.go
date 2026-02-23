@@ -43,8 +43,7 @@ func TestAnalysis_Transactions(t *testing.T) {
 	}
 }
 
-func TestAnalysis_NoPermissionsRequired(t *testing.T) {
-	// Analysis is gateway access — no permissions needed.
+func TestAnalysis_GatewayAccess(t *testing.T) {
 	c, err := NewClient(WithBaseURL("http://localhost"), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)

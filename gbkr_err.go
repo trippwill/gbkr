@@ -10,29 +10,9 @@ func (e Error) Error() string { return string(e) }
 
 // Sentinel errors.
 const (
-	ErrBaseURLRequired  = Error("base URL is required: use WithBaseURL")
-	ErrPermissionDenied = Error("permission denied")
-	ErrAPIRequest       = Error("API request failed")
+	ErrBaseURLRequired = Error("base URL is required: use WithBaseURL")
+	ErrAPIRequest      = Error("API request failed")
 )
-
-// PermissionDeniedError is returned when a capability is requested
-// without the required permissions.
-type PermissionDeniedError struct {
-	Required []Permission
-	Missing  []Permission
-}
-
-func (e *PermissionDeniedError) Error() string {
-	return fmt.Sprintf("%s: missing %v", ErrPermissionDenied, e.Missing)
-}
-
-func (e *PermissionDeniedError) Unwrap() error { return ErrPermissionDenied }
-
-// ErrPermissionsDenied constructs a [PermissionDeniedError] listing the
-// missing permissions from the required set.
-func ErrPermissionsDenied(required, missing []Permission) error {
-	return &PermissionDeniedError{Required: required, Missing: missing}
-}
 
 // APIError represents a non-2xx response from the IBKR API.
 type APIError struct {

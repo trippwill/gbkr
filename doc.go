@@ -1,11 +1,11 @@
-// Package gbkr provides a permission-gated client for the IBKR REST API.
+// Package gbkr provides a Go client for the IBKR REST API.
 //
 // # Two-Phase Session Model
 //
 // The package uses a two-tier client model that mirrors the IBKR gateway's
 // session lifecycle:
 //
-//  1. [Client] — created via [NewClient]. Provides ungated gateway capabilities:
+//  1. [Client] — created via [NewClient]. Provides gateway capabilities:
 //     [Client.SessionStatus], [Client.Portfolio], and [Client.Analysis].
 //
 //  2. [BrokerageClient] — obtained by calling [Client.BrokerageSession], which
@@ -29,16 +29,6 @@
 //	Contracts                  BrokerageClient.Contracts()  /iserver/contract/{conid}/*
 //	SecurityDefinitions        BrokerageClient.SecurityDefinitions() /iserver/secdef/*
 //	Trades                     BrokerageClient.Trades()     /iserver/account/trades
-//
-// # Permission Model
-//
-// A two-tier permission model (Scope:Level) gates brokerage session elevation.
-// Consumers grant permissions via [WithPermissions], [WithPermissionsFromFile],
-// or JIT prompting with [WithInteractivePrompt].
-// Predefined sets [ReadOnly] and [FullAccess] cover common scenarios.
-//
-// Gateway access ([Client.Portfolio], [Client.Analysis], [Client.SessionStatus])
-// requires no permissions. Only [Client.BrokerageSession] checks permissions.
 //
 // # API Pacing
 //

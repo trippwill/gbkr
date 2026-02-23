@@ -23,7 +23,7 @@ func TestContracts_Info(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(WithBaseURL(srv.URL), WithPermissions(ReadOnly()), WithRateLimit(nil))
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
 	if err != nil {
 		t.Fatal(err)
 	}

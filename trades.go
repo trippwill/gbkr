@@ -10,14 +10,11 @@ import (
 
 // Trades provides read access to recent trade executions (brokerage session required).
 // IBKR path prefix: /iserver/account/trades
-//
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 type Trades struct {
 	c *Client
 }
 
 // Trades returns a [*Trades] handle for querying recent trade executions.
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 func (bc *BrokerageClient) Trades() *Trades {
 	return &Trades{c: bc.Client}
 }

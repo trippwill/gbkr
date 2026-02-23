@@ -10,15 +10,12 @@ import (
 
 // Analysis provides read-only access to Portfolio Analyst data.
 // IBKR path prefix: /pa/*
-//
-// Gateway access — no permission check required.
 type Analysis struct {
 	c       *Client
 	txCache *ttlCache[models.TransactionHistoryResponse]
 }
 
 // Analysis returns an [*Analysis] handle for querying Portfolio Analyst data.
-// Gateway access — no permission check required.
 //
 // The returned handle caches results for 15 minutes (matching the IBKR pacing
 // limit). Callers should retain and reuse the handle rather than calling

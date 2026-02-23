@@ -8,21 +8,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 )
 
-// Client is the base IBKR API client. It holds transport configuration
-// and granted permissions. Provides read-only capabilities and session
-// elevation via [BrokerageSession].
+// Client is the base IBKR API client. It holds transport configuration.
+// Provides read-only capabilities and session elevation via [BrokerageSession].
 type Client struct {
 	baseURL        string
 	httpClient     *http.Client
-	permissions    PermissionSet
-	prompter       Prompter
 	pacingObserver PacingObserver // staging field; attached to PacingPolicy during init
 	pacingDisabled bool           // set by WithRateLimit(nil) to suppress default init
 	pacing         *PacingPolicy
-	mu             sync.Mutex
 }
 
 // BrokerageClient provides capabilities requiring a brokerage session.
@@ -56,11 +51,6 @@ func NewClient(opts ...Option) (*Client, error) {
 	c.pacingObserver = nil // clear staging field
 
 	return c, nil
-}
-
-// Permissions returns the client's granted permission set.
-func (c *Client) Permissions() PermissionSet {
-	return c.permissions
 }
 
 func (c *Client) doGet(ctx context.Context, path string, query url.Values, result any) error {

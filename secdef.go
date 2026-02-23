@@ -9,14 +9,11 @@ import (
 
 // SecurityDefinitions provides search access to security definitions.
 // IBKR path prefix: /iserver/secdef/*
-//
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 type SecurityDefinitions struct {
 	c *Client
 }
 
 // SecurityDefinitions returns a [*SecurityDefinitions] handle for searching security definitions.
-// No per-method permission check — access is gated by [Client.BrokerageSession].
 func (bc *BrokerageClient) SecurityDefinitions() *SecurityDefinitions {
 	return &SecurityDefinitions{c: bc.Client}
 }
