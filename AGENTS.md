@@ -36,7 +36,8 @@ go fmt ./...                      # format code
 doc.go               # Package documentation
 gbkr.go              # Core Client struct, HTTP transport (doGet, doPost)
 gbkr_err.go          # Error type, sentinel errors, APIError
-options.go           # Functional options (WithBaseURL, WithHTTPClient, etc.)
+options.go           # Functional options (WithBaseURL, WithHTTPClient, WithLogger, etc.)
+operation.go         # Operation type, Op* constants, emitOp helper (ADR-007)
 auth.go              # SessionClient interface + Session(c) constructor
 accounts.go          # AccountLister + AccountReader interfaces + constructors
 positions.go         # PositionReader interface + Positions(c, id) constructor
@@ -70,6 +71,22 @@ There is no runtime permission system. Dangerous capabilities (trading, banking)
 live in separate Go modules (`gbkr/trading`, `gbkr/banking`) within the same repository,
 each with their own `go.mod`. This makes the dependency visible in any consumer's `go.mod`.
 See ADR-006 for the rationale.
+
+### Operation Event Sourcing
+
+Every IBKR API call emits a structured `slog` record via the client's logger, namespaced
+under the `"gbkr"` group (see ADR-007). Key points:
+
+- **Logger**: `Client` holds a `*slog.Logger` (default: `slog.Default().WithGroup("gbkr")`).
+  Consumers can override via `WithLogger(*slog.Logger)`.
+- **Operation constants**: `type Operation string` constants in `operation.go` are the
+  stable event vocabulary. Their string values are part of the wire contract — do not rename after a stable module version is declared.
+- **Emission helper**: `emitOp()` on `*Client` handles level selection (Info/Warn), timing,
+  and attribute construction. Call it in every public method that makes an IBKR API call.
+- **Attributes**: Emit only relevant context fields per operation (`account_id`, `symbol`,
+  `conid`). Do not emit zero-value attributes. Never emit request/response body content.
+- **When adding new API methods**: Define a new `Op*` constant and call `emitOp()` following
+  the same pattern as existing methods.
 
 ## Conventions
 

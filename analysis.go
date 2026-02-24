@@ -3,6 +3,7 @@ package gbkr
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/trippwill/gbkr/models"
@@ -42,6 +43,7 @@ func (a *Analysis) Transactions(ctx context.Context, accountID models.AccountID,
 	if cached := a.txCache.get(key); cached != nil {
 		return cached, nil
 	}
+	start := time.Now()
 	req := models.TransactionHistoryRequest{
 		AcctIDs:  []string{string(accountID)},
 		ConIDs:   []int{int(conID)},
@@ -51,7 +53,12 @@ func (a *Analysis) Transactions(ctx context.Context, accountID models.AccountID,
 		req.Days = fmt.Sprintf("%d", days)
 	}
 	var result models.TransactionHistoryResponse
-	if err := a.c.doPost(ctx, "/pa/transactions", req, &result); err != nil {
+	err := a.c.doPost(ctx, "/pa/transactions", req, &result)
+	a.c.emitOp(ctx, OpTransactions, err, time.Since(start),
+		slog.String("account_id", string(accountID)),
+		slog.Int64("conid", int64(conID)),
+		slog.Int("count", len(result.Transactions)))
+	if err != nil {
 		a.txCache.invalidate()
 		return nil, err
 	}

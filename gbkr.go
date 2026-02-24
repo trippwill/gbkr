@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,6 +16,7 @@ import (
 type Client struct {
 	baseURL        string
 	httpClient     *http.Client
+	logger         *slog.Logger
 	pacingObserver PacingObserver // staging field; attached to PacingPolicy during init
 	pacingDisabled bool           // set by WithRateLimit(nil) to suppress default init
 	pacing         *PacingPolicy
@@ -40,6 +42,12 @@ func NewClient(opts ...Option) (*Client, error) {
 	if c.baseURL == "" {
 		return nil, ErrBaseURLRequired
 	}
+
+	// Initialize logger with "gbkr" group.
+	if c.logger == nil {
+		c.logger = slog.Default()
+	}
+	c.logger = c.logger.WithGroup("gbkr")
 
 	// Initialize pacing policy if not explicitly set by WithRateLimit.
 	if c.pacing == nil && !c.pacingDisabled {

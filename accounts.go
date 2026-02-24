@@ -3,7 +3,9 @@ package gbkr
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
+	"time"
 
 	"github.com/trippwill/gbkr/models"
 )
@@ -22,8 +24,11 @@ func (bc *BrokerageClient) Accounts() *Accounts {
 // List returns all tradable accounts
 // (GET /iserver/accounts).
 func (a *Accounts) List(ctx context.Context) (*models.AccountList, error) {
+	start := time.Now()
 	var result models.AccountList
-	if err := a.c.doGet(ctx, "/iserver/accounts", nil, &result); err != nil {
+	err := a.c.doGet(ctx, "/iserver/accounts", nil, &result)
+	a.c.emitOp(ctx, OpListAccounts, err, time.Since(start), slog.Int("count", len(result.Accounts)))
+	if err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -32,8 +37,11 @@ func (a *Accounts) List(ctx context.Context) (*models.AccountList, error) {
 // PnL returns partitioned P&L data across accounts
 // (GET /iserver/account/pnl/partitioned).
 func (a *Accounts) PnL(ctx context.Context) (*models.PnLPartitioned, error) {
+	start := time.Now()
 	var result models.PnLPartitioned
-	if err := a.c.doGet(ctx, "/iserver/account/pnl/partitioned", nil, &result); err != nil {
+	err := a.c.doGet(ctx, "/iserver/account/pnl/partitioned", nil, &result)
+	a.c.emitOp(ctx, OpAccountPnL, err, time.Since(start), slog.Int("count", len(result.AcctPnL)))
+	if err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -59,9 +67,13 @@ func (a *Account) ID() models.AccountID {
 // Summary returns the account summary
 // (GET /iserver/account/{accountId}/summary).
 func (a *Account) Summary(ctx context.Context) (*models.AccountSummary, error) {
+	start := time.Now()
 	var result models.AccountSummary
 	path := fmt.Sprintf("/iserver/account/%s/summary", url.PathEscape(string(a.accountID)))
-	if err := a.c.doGet(ctx, path, nil, &result); err != nil {
+	err := a.c.doGet(ctx, path, nil, &result)
+	a.c.emitOp(ctx, OpAccountSummary, err, time.Since(start),
+		slog.String("account_id", string(a.accountID)))
+	if err != nil {
 		return nil, err
 	}
 	return &result, nil
