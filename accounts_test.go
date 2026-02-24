@@ -3,6 +3,7 @@ package gbkr
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -111,5 +112,49 @@ func TestAccount_Summary(t *testing.T) {
 	}
 	if result.Currency != "USD" {
 		t.Errorf("Currency = %q, want %q", result.Currency, "USD")
+	}
+}
+
+func TestAccounts_List_EmitsEvent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"accounts":        []string{"U1234567"},
+			"selectedAccount": "U1234567",
+		})
+	}))
+	defer srv.Close()
+
+	h := newCaptureHandler()
+	logger := slog.New(h)
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil), WithLogger(logger))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bc := &BrokerageClient{Client: c}
+
+	_, err = bc.Accounts().List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if h.count() != 1 {
+		t.Fatalf("expected 1 event, got %d", h.count())
+	}
+
+	r := h.last()
+	if r.Level != slog.LevelInfo {
+		t.Errorf("level = %v, want Info", r.Level)
+	}
+
+	var gotOp string
+	r.Attrs(func(a slog.Attr) bool {
+		if a.Key == "op" {
+			gotOp = a.Value.String()
+		}
+		return true
+	})
+	if gotOp != string(OpListAccounts) {
+		t.Errorf("op = %q, want %q", gotOp, OpListAccounts)
 	}
 }

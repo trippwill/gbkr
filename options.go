@@ -2,6 +2,7 @@ package gbkr
 
 import (
 	"crypto/tls"
+	"log/slog"
 	"net/http"
 )
 
@@ -58,6 +59,16 @@ func WithRateLimit(policy *PacingPolicy) Option {
 func WithPacingObserver(obs PacingObserver) Option {
 	return func(c *Client) error {
 		c.pacingObserver = obs
+		return nil
+	}
+}
+
+// WithLogger sets a custom [*slog.Logger] for operation event emission.
+// The "gbkr" group is always applied to the provided logger.
+// If not set, [slog.Default] is used.
+func WithLogger(l *slog.Logger) Option {
+	return func(c *Client) error {
+		c.logger = l
 		return nil
 	}
 }

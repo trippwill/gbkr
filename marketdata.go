@@ -3,8 +3,10 @@ package gbkr
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/trippwill/gbkr/models"
 )
@@ -23,6 +25,7 @@ func (bc *BrokerageClient) MarketData() *MarketData {
 // Snapshot returns a live market data snapshot
 // (GET /iserver/marketdata/snapshot).
 func (m *MarketData) Snapshot(ctx context.Context, params models.SnapshotParams) ([]models.Snapshot, error) {
+	start := time.Now()
 	q := url.Values{}
 	if len(params.ConIDs) > 0 {
 		ids := make([]string, len(params.ConIDs))
@@ -40,7 +43,9 @@ func (m *MarketData) Snapshot(ctx context.Context, params models.SnapshotParams)
 	}
 
 	var result []models.Snapshot
-	if err := m.c.doGet(ctx, "/iserver/marketdata/snapshot", q, &result); err != nil {
+	err := m.c.doGet(ctx, "/iserver/marketdata/snapshot", q, &result)
+	m.c.emitOp(ctx, OpMarketDataSnapshot, err, time.Since(start))
+	if err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -49,6 +54,7 @@ func (m *MarketData) Snapshot(ctx context.Context, params models.SnapshotParams)
 // History returns historical OHLC bar data
 // (GET /iserver/marketdata/history).
 func (m *MarketData) History(ctx context.Context, params models.HistoryParams) (*models.HistoryResponse, error) {
+	start := time.Now()
 	q := url.Values{}
 	q.Set("conid", fmt.Sprintf("%d", int(params.ConID)))
 	q.Set("period", params.Period.String())
@@ -58,7 +64,10 @@ func (m *MarketData) History(ctx context.Context, params models.HistoryParams) (
 	}
 
 	var result models.HistoryResponse
-	if err := m.c.doGet(ctx, "/iserver/marketdata/history", q, &result); err != nil {
+	err := m.c.doGet(ctx, "/iserver/marketdata/history", q, &result)
+	m.c.emitOp(ctx, OpMarketDataHistory, err, time.Since(start),
+		slog.Int64("conid", int64(params.ConID)))
+	if err != nil {
 		return nil, err
 	}
 	return &result, nil
