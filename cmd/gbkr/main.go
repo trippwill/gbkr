@@ -7,7 +7,7 @@ import (
 	"log"
 
 	"github.com/trippwill/gbkr"
-	"github.com/trippwill/gbkr/models"
+	"github.com/trippwill/gbkr/brokerage"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 	ctx := context.Background()
 
 	// Session: elevate to brokerage session
-	bc, err := client.BrokerageSession(ctx, &models.SSOInitRequest{})
+	bc, err := brokerage.NewSession(ctx, client, &brokerage.SSOInitRequest{})
 	if err != nil {
 		log.Fatalf("Brokerage session denied: %v", err)
 	}
@@ -71,26 +71,26 @@ func main() {
 	}
 
 	// Positions: obtained from Portfolio (gateway access)
-	portfolio := client.Portfolio(acctID)
+	portfolio := client.Portfolio(gbkr.AccountID(acctID))
 
-	var conIDs []models.ConID
+	var conIDs []gbkr.ConID
 	pos, err := portfolio.Positions(ctx, 0)
 	if err != nil {
 		log.Printf("Error getting positions: %v", err)
 	} else {
 		for _, p := range pos {
 			fmt.Printf("Position: %s qty=%.0f\n", p.ContractDesc, p.Qty)
-			if p.AssetClass != models.AssetOption && p.ConID != 0 {
-				conIDs = append(conIDs, p.ConID)
+			if p.AssetClass != gbkr.AssetOption && p.ConID != 0 {
+				conIDs = append(conIDs, gbkr.ConID(p.ConID))
 			}
 		}
 	}
 
 	// Market data
 	md := bc.MarketData()
-	snapshots, err := md.Snapshot(ctx, models.SnapshotParams{
+	snapshots, err := md.Snapshot(ctx, brokerage.SnapshotParams{
 		ConIDs: conIDs,
-		Fields: models.FieldsQuote,
+		Fields: brokerage.FieldsQuote,
 	})
 	if err != nil {
 		log.Printf("Error getting market data snapshots: %v", err)
@@ -100,11 +100,11 @@ func main() {
 		fmt.Printf(
 			"Market Data(%v): %s last=%s bid=%s ask=%s vol=%s\n",
 			snap.UpdateTime,
-			snap.Get(models.FieldSymbol),
-			snap.Get(models.FieldLast),
-			snap.Get(models.FieldBid),
-			snap.Get(models.FieldAsk),
-			snap.Get(models.FieldVolume),
+			snap.Get(brokerage.FieldSymbol),
+			snap.Get(brokerage.FieldLast),
+			snap.Get(brokerage.FieldBid),
+			snap.Get(brokerage.FieldAsk),
+			snap.Get(brokerage.FieldVolume),
 		)
 	}
 
@@ -131,7 +131,7 @@ func main() {
 	// Analysis: transaction history (gateway access — no brokerage session required)
 	analysis := client.Analysis()
 	if len(accountList.Accounts) > 0 && len(conIDs) > 0 {
-		hist, err := analysis.Transactions(ctx, accountList.Accounts[0], conIDs[0], 7)
+		hist, err := analysis.Transactions(ctx, gbkr.AccountID(accountList.Accounts[0]), gbkr.ConID(conIDs[0]), 7)
 		if err != nil {
 			log.Printf("Error getting transaction history: %v", err)
 		} else {

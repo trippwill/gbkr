@@ -1,6 +1,6 @@
 package gbkr
 
-import "fmt"
+import "github.com/trippwill/gbkr/internal/transport"
 
 // Error is a string-based sentinel error type. Use const declarations
 // for package-level error values that callers can check with [errors.Is].
@@ -9,25 +9,16 @@ type Error string
 func (e Error) Error() string { return string(e) }
 
 // Sentinel errors.
-const (
-	ErrBaseURLRequired = Error("base URL is required: use WithBaseURL")
-	ErrAPIRequest      = Error("API request failed")
-)
+const ErrBaseURLRequired = Error("base URL is required: use WithBaseURL")
 
 // APIError represents a non-2xx response from the IBKR API.
-type APIError struct {
-	StatusCode int
-	Status     string
-	Body       []byte
-}
+// Re-exported from the internal transport package.
+type APIError = transport.APIError
 
-func (e *APIError) Error() string {
-	return fmt.Sprintf("%s: %s: %s", ErrAPIRequest, e.Status, string(e.Body))
-}
-
-func (e *APIError) Unwrap() error { return ErrAPIRequest }
+// ErrAPIRequest is a sentinel error for non-2xx API responses.
+var ErrAPIRequest error = transport.ErrAPIRequest
 
 // ErrAPI constructs an [APIError] from an HTTP response.
 func ErrAPI(statusCode int, status string, body []byte) error {
-	return &APIError{StatusCode: statusCode, Status: status, Body: body}
+	return transport.NewAPIError(statusCode, status, body)
 }

@@ -2,18 +2,117 @@ package gbkr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/trippwill/gbkr/models"
+	"github.com/trippwill/gbkr/internal/jx"
 )
+
+// TransactionHistoryRequest is the request body for POST /pa/transactions.
+type TransactionHistoryRequest struct {
+	AcctIDs  []string `json:"acctIds"`
+	ConIDs   []int    `json:"conids"`
+	Currency string   `json:"currency"`
+	Days     string   `json:"days,omitempty"`
+}
+
+// TransactionHistoryResponse is the response from POST /pa/transactions.
+type TransactionHistoryResponse struct {
+	// Currency is the reporting currency.
+	Currency Currency
+	// From is the epoch start time of the range.
+	From int64
+	// To is the epoch end time of the range.
+	To int64
+	// IncludesRealTime indicates if trades are up to date.
+	IncludesRealTime bool
+	// Transactions is the list of transactions.
+	Transactions []Transaction
+}
+
+func (r *TransactionHistoryResponse) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Currency         *string          `json:"currency,omitempty"`
+		From             *int64           `json:"from,omitempty"`
+		To               *int64           `json:"to,omitempty"`
+		IncludesRealTime *bool            `json:"includesRealTime,omitempty"`
+		Transactions     *json.RawMessage `json:"transactions,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.Currency = Currency(jx.Deref(raw.Currency))
+	r.From = jx.Deref(raw.From)
+	r.To = jx.Deref(raw.To)
+	r.IncludesRealTime = jx.Deref(raw.IncludesRealTime)
+	if raw.Transactions != nil {
+		if err := json.Unmarshal(*raw.Transactions, &r.Transactions); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Transaction represents a single transaction from POST /pa/transactions.
+type Transaction struct {
+	// Date is the human-readable datetime of the transaction.
+	Date string
+	// Currency is the traded instrument currency.
+	Currency Currency
+	// FxRate is the forex conversion rate.
+	FxRate float64
+	// Price is the price per share.
+	Price float64
+	// Qty is the quantity traded (negative for sells).
+	Qty int
+	// Account is the account identifier.
+	Account AccountID
+	// Amount is the total trade value.
+	Amount float64
+	// ConID is the contract identifier.
+	ConID ConID
+	// Type is the order side (e.g., "Sell", "Buy").
+	Type string
+	// Desc is the long company name.
+	Desc string
+}
+
+func (t *Transaction) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Date     *string  `json:"date,omitempty"`
+		Currency *string  `json:"cur,omitempty"`
+		FxRate   *float64 `json:"fxRate,omitempty"`
+		Price    *float64 `json:"pr,omitempty"`
+		Qty      *int     `json:"qty,omitempty"`
+		Account  *string  `json:"acctid,omitempty"`
+		Amount   *float64 `json:"amt,omitempty"`
+		ConID    *int     `json:"conid,omitempty"`
+		Type     *string  `json:"type,omitempty"`
+		Desc     *string  `json:"desc,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	t.Date = jx.Deref(raw.Date)
+	t.Currency = Currency(jx.Deref(raw.Currency))
+	t.FxRate = jx.Deref(raw.FxRate)
+	t.Price = jx.Deref(raw.Price)
+	t.Qty = jx.Deref(raw.Qty)
+	t.Account = AccountID(jx.Deref(raw.Account))
+	t.Amount = jx.Deref(raw.Amount)
+	t.ConID = ConID(jx.Deref(raw.ConID))
+	t.Type = jx.Deref(raw.Type)
+	t.Desc = jx.Deref(raw.Desc)
+	return nil
+}
 
 // Analysis provides read-only access to Portfolio Analyst data.
 // IBKR path prefix: /pa/*
 type Analysis struct {
 	c       *Client
-	txCache *ttlCache[models.TransactionHistoryResponse]
+	txCache *ttlCache[TransactionHistoryResponse]
 }
 
 // Analysis returns an [*Analysis] handle for querying Portfolio Analyst data.
@@ -28,7 +127,7 @@ func (c *Client) Analysis() *Analysis {
 	}
 	return &Analysis{
 		c: c,
-		txCache: &ttlCache[models.TransactionHistoryResponse]{
+		txCache: &ttlCache[TransactionHistoryResponse]{
 			ttl:      15 * time.Minute,
 			observer: obs,
 			path:     "/pa/transactions",
@@ -38,13 +137,13 @@ func (c *Client) Analysis() *Analysis {
 
 // Transactions returns transaction history for an account and contract
 // (POST /pa/transactions).
-func (a *Analysis) Transactions(ctx context.Context, accountID models.AccountID, conID models.ConID, days int) (*Cached[models.TransactionHistoryResponse], error) {
+func (a *Analysis) Transactions(ctx context.Context, accountID AccountID, conID ConID, days int) (*Cached[TransactionHistoryResponse], error) {
 	key := fmt.Sprintf("%s:%d:%d", accountID, conID, days)
 	if cached := a.txCache.get(key); cached != nil {
 		return cached, nil
 	}
 	start := time.Now()
-	req := models.TransactionHistoryRequest{
+	req := TransactionHistoryRequest{
 		AcctIDs:  []string{string(accountID)},
 		ConIDs:   []int{int(conID)},
 		Currency: "USD",
@@ -52,7 +151,7 @@ func (a *Analysis) Transactions(ctx context.Context, accountID models.AccountID,
 	if days > 0 {
 		req.Days = fmt.Sprintf("%d", days)
 	}
-	var result models.TransactionHistoryResponse
+	var result TransactionHistoryResponse
 	err := a.c.doPost(ctx, "/pa/transactions", req, &result)
 	a.c.emitOp(ctx, OpTransactions, err, time.Since(start),
 		slog.String("account_id", string(accountID)),
