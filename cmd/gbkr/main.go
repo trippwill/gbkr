@@ -131,7 +131,7 @@ func main() {
 	// Analysis: transaction history (gateway access — no brokerage session required)
 	analysis := client.Analysis()
 	if len(accountList.Accounts) > 0 && len(conIDs) > 0 {
-		hist, err := analysis.Transactions(ctx, gbkr.AccountID(accountList.Accounts[0]), gbkr.ConID(conIDs[0]), 7)
+		hist, err := analysis.Transactions(ctx, accountList.Accounts[0], conIDs[0], 7)
 		if err != nil {
 			log.Printf("Error getting transaction history: %v", err)
 		} else {
