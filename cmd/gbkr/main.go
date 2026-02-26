@@ -81,7 +81,7 @@ func main() {
 		for _, p := range pos {
 			fmt.Printf("Position: %s qty=%.0f\n", p.ContractDesc, p.Qty)
 			if p.AssetClass != gbkr.AssetOption && p.ConID != 0 {
-				conIDs = append(conIDs, gbkr.ConID(p.ConID))
+				conIDs = append(conIDs, p.ConID)
 			}
 		}
 	}
