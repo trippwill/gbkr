@@ -2,52 +2,44 @@ package gbkr
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
+
+	"github.com/trippwill/gbkr/internal/transport"
 )
 
 // Client is the base IBKR API client. It holds transport configuration.
-// Provides read-only capabilities and session elevation via [BrokerageSession].
+// Provides read-only capabilities and session elevation via [brokerage.NewSession].
 type Client struct {
-	baseURL        string
-	httpClient     *http.Client
-	logger         *slog.Logger
+	t              *transport.Transport
 	pacingObserver PacingObserver // staging field; attached to PacingPolicy during init
 	pacingDisabled bool           // set by WithRateLimit(nil) to suppress default init
 	pacing         *PacingPolicy
 }
 
-// BrokerageClient provides capabilities requiring a brokerage session.
-// Embeds [*Client], inheriting all read-only capabilities.
-// Obtained via [Client.BrokerageSession].
-type BrokerageClient struct {
-	*Client
-}
-
 // NewClient creates a new IBKR API client with the given options.
 func NewClient(opts ...Option) (*Client, error) {
 	c := &Client{
-		httpClient: http.DefaultClient,
+		t: &transport.Transport{
+			HTTPClient: http.DefaultClient,
+		},
 	}
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
 			return nil, fmt.Errorf("applying option: %w", err)
 		}
 	}
-	if c.baseURL == "" {
+	if c.t.BaseURL == "" {
 		return nil, ErrBaseURLRequired
 	}
 
 	// Initialize logger with "gbkr" group.
-	if c.logger == nil {
-		c.logger = slog.Default()
+	if c.t.Logger == nil {
+		c.t.Logger = slog.Default()
 	}
-	c.logger = c.logger.WithGroup("gbkr")
+	c.t.Logger = c.t.Logger.WithGroup("gbkr")
 
 	// Initialize pacing policy if not explicitly set by WithRateLimit.
 	if c.pacing == nil && !c.pacingDisabled {
@@ -58,72 +50,23 @@ func NewClient(opts ...Option) (*Client, error) {
 	}
 	c.pacingObserver = nil // clear staging field
 
+	// Wire pacing as a transport request hook.
+	if c.pacing != nil {
+		c.t.Hook = c.pacing
+	}
+
 	return c, nil
 }
 
+// Transport returns the underlying transport for use by subpackages within this module.
+func (c *Client) Transport() *transport.Transport {
+	return c.t
+}
+
 func (c *Client) doGet(ctx context.Context, path string, query url.Values, result any) error {
-	u := c.baseURL + path
-	if len(query) > 0 {
-		u += "?" + query.Encode()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-
-	return c.doRequest(req, result)
+	return c.t.Get(ctx, path, query, result)
 }
 
 func (c *Client) doPost(ctx context.Context, path string, body any, result any) error {
-	var bodyReader io.Reader
-	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
-		}
-		bodyReader = strings.NewReader(string(data))
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bodyReader)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	return c.doRequest(req, result)
-}
-
-func (c *Client) doRequest(req *http.Request, result any) error {
-	if c.pacing != nil {
-		path := req.URL.Path
-		if err := c.pacing.waitForSlot(req.Context(), req.Method, path); err != nil {
-			return err
-		}
-		defer c.pacing.releaseSlot(req.Method, path)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("executing request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("reading response: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return ErrAPI(resp.StatusCode, resp.Status, data)
-	}
-
-	if result != nil && len(data) > 0 {
-		if err := json.Unmarshal(data, result); err != nil {
-			return fmt.Errorf("decoding response: %w", err)
-		}
-	}
-	return nil
+	return c.t.Post(ctx, path, body, result)
 }

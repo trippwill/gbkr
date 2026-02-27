@@ -158,6 +158,16 @@ func (p *PacingPolicy) waitForSlot(ctx context.Context, method, path string) err
 	return nil
 }
 
+// BeforeRequest implements [transport.RequestHook].
+func (p *PacingPolicy) BeforeRequest(ctx context.Context, method, path string) error {
+	return p.waitForSlot(ctx, method, path)
+}
+
+// AfterRequest implements [transport.RequestHook].
+func (p *PacingPolicy) AfterRequest(method, path string) {
+	p.releaseSlot(method, path)
+}
+
 // releaseSlot releases a semaphore slot for the given path.
 // No-op for rate-limited endpoints.
 func (p *PacingPolicy) releaseSlot(method, path string) {

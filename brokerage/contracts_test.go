@@ -1,12 +1,38 @@
-package models
+package brokerage
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 )
 
+func TestContracts_Info(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/iserver/contract/265598/info" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"con_id":          265598,
+			"symbol":          "AAPL",
+			"instrument_type": "STK",
+			"company_name":    "Apple Inc",
+		})
+	})
+	defer srv.Close()
+
+	info, err := bc.Contracts().Info(context.Background(), 265598)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Symbol != "AAPL" {
+		t.Errorf("Symbol = %q", info.Symbol)
+	}
+}
+
 func TestContractDetails_UnmarshalJSON(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"con_id": 265598,
 		"symbol": "AAPL",
 		"instrument_type": "STK",
@@ -18,9 +44,9 @@ func TestContractDetails_UnmarshalJSON(t *testing.T) {
 		"expiry": "",
 		"right": "",
 		"und_conid": 0
-	}`
+	}`)
 	var cd ContractDetails
-	if err := json.Unmarshal([]byte(data), &cd); err != nil {
+	if err := json.Unmarshal(data, &cd); err != nil {
 		t.Fatal(err)
 	}
 	if cd.ConID != 265598 {
@@ -44,7 +70,7 @@ func TestContractDetails_UnmarshalJSON(t *testing.T) {
 }
 
 func TestContractDetails_Option(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"con_id": 999,
 		"symbol": "AAPL",
 		"instrument_type": "OPT",
@@ -56,9 +82,9 @@ func TestContractDetails_Option(t *testing.T) {
 		"expiry": "20240119",
 		"right": "C",
 		"und_conid": 265598
-	}`
+	}`)
 	var cd ContractDetails
-	if err := json.Unmarshal([]byte(data), &cd); err != nil {
+	if err := json.Unmarshal(data, &cd); err != nil {
 		t.Fatal(err)
 	}
 	if cd.Strike != 190.0 {
@@ -79,14 +105,14 @@ func TestContractDetails_Option(t *testing.T) {
 }
 
 func TestContractSearchResult_UnmarshalJSON(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"conid": 265598,
 		"companyName": "Apple Inc",
 		"symbol": "AAPL",
 		"secType": "STK"
-	}`
+	}`)
 	var r ContractSearchResult
-	if err := json.Unmarshal([]byte(data), &r); err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		t.Fatal(err)
 	}
 	if r.ConID != 265598 {
@@ -104,9 +130,9 @@ func TestContractSearchResult_UnmarshalJSON(t *testing.T) {
 }
 
 func TestContractSearchResult_Partial(t *testing.T) {
-	data := `{"conid": 123}`
+	data := []byte(`{"conid": 123}`)
 	var r ContractSearchResult
-	if err := json.Unmarshal([]byte(data), &r); err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		t.Fatal(err)
 	}
 	if r.ConID != 123 {

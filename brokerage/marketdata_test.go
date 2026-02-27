@@ -1,9 +1,114 @@
-package models
+package brokerage
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
+
+	"github.com/trippwill/gbkr"
 )
+
+func TestMarketData_Snapshot(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/iserver/marketdata/snapshot" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("conids"); got != "265598" {
+			t.Errorf("conids = %q, want %q", got, "265598")
+		}
+		if got := r.URL.Query().Get("fields"); got != "31" {
+			t.Errorf("fields = %q, want %q", got, "31")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]map[string]any{ //nolint:errcheck
+			{
+				"conid":     265598,
+				"server_id": "srv1",
+				"_updated":  1700000000,
+				"31":        175.50,
+			},
+		})
+	})
+	defer srv.Close()
+
+	params := SnapshotParams{
+		ConIDs: []gbkr.ConID{265598},
+		Fields: []SnapshotField{FieldLast},
+	}
+	result, err := bc.MarketData().Snapshot(context.Background(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("got %d snapshots, want 1", len(result))
+	}
+	if result[0].ConID != 265598 {
+		t.Errorf("ConID = %d", result[0].ConID)
+	}
+	if result[0].ServerID != "srv1" {
+		t.Errorf("ServerID = %q", result[0].ServerID)
+	}
+	last := result[0].Get(FieldLast).Float64()
+	if last != 175.50 {
+		t.Errorf("FieldLast = %f, want 175.50", last)
+	}
+}
+
+func TestMarketData_History(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/iserver/marketdata/history" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("conid"); got != "265598" {
+			t.Errorf("conid = %q", got)
+		}
+		if got := r.URL.Query().Get("period"); got != "1d" {
+			t.Errorf("period = %q", got)
+		}
+		if got := r.URL.Query().Get("bar"); got != "5min" {
+			t.Errorf("bar = %q", got)
+		}
+		if got := r.URL.Query().Get("exchange"); got != "NASDAQ" {
+			t.Errorf("exchange = %q", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"symbol":     "AAPL",
+			"timePeriod": "1d",
+			"data": []map[string]any{
+				{"o": 170.0, "h": 176.0, "l": 169.5, "c": 175.5, "v": 1000000.0, "t": 1700000000},
+			},
+		})
+	})
+	defer srv.Close()
+
+	params := HistoryParams{
+		ConID:    265598,
+		Period:   TimePeriod{Count: 1, Unit: PeriodDays},
+		Bar:      BarSize{Count: 5, Unit: BarMinutes},
+		Exchange: "NASDAQ",
+	}
+	result, err := bc.MarketData().History(context.Background(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Symbol != "AAPL" {
+		t.Errorf("Symbol = %q", result.Symbol)
+	}
+	if len(result.Bars) != 1 {
+		t.Fatalf("got %d bars, want 1", len(result.Bars))
+	}
+	bar := result.Bars[0]
+	if bar.Open != 170.0 {
+		t.Errorf("Open = %f", bar.Open)
+	}
+	if bar.Close != 175.5 {
+		t.Errorf("Close = %f", bar.Close)
+	}
+}
 
 func TestFieldValue_Absent(t *testing.T) {
 	var fv FieldValue
@@ -41,7 +146,6 @@ func TestFieldValue_Numeric(t *testing.T) {
 }
 
 func TestFieldValue_StringEncoded(t *testing.T) {
-	// IBKR sometimes returns numbers as strings.
 	fv := FieldValue{raw: json.RawMessage(`"123.45"`)}
 	if fv.Float64() != 123.45 {
 		t.Errorf("Float64() = %f, want 123.45", fv.Float64())
@@ -73,16 +177,16 @@ func TestFieldValue_RawJSON(t *testing.T) {
 }
 
 func TestSnapshot_UnmarshalJSON(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"conid": 265598,
 		"server_id": "srv1",
 		"_updated": 1700000000,
 		"31": 175.50,
 		"84": "170.25",
 		"55": "AAPL"
-	}`
+	}`)
 	var s Snapshot
-	if err := json.Unmarshal([]byte(data), &s); err != nil {
+	if err := json.Unmarshal(data, &s); err != nil {
 		t.Fatal(err)
 	}
 	if s.ConID != 265598 {
@@ -118,9 +222,9 @@ func TestSnapshot_Get_Absent(t *testing.T) {
 }
 
 func TestSnapshot_hasAll(t *testing.T) {
-	data := `{"conid": 1, "31": 100}`
+	data := []byte(`{"conid": 1, "31": 100}`)
 	var s Snapshot
-	json.Unmarshal([]byte(data), &s) //nolint:errcheck
+	json.Unmarshal(data, &s) //nolint:errcheck
 
 	if !s.hasAll([]SnapshotField{FieldLast}) {
 		t.Error("should have FieldLast")
@@ -131,15 +235,15 @@ func TestSnapshot_hasAll(t *testing.T) {
 }
 
 func TestSnapshot_AsQuote(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"conid": 1,
 		"55": "AAPL", "7051": "Apple Inc.",
 		"31": 175.5, "84": 175.0, "86": 176.0,
 		"70": 177.0, "71": 174.0, "7295": 174.5, "7296": 175.0, "7741": 173.0,
 		"87": 1000000, "82": 2.5, "83": 1.45
-	}`
+	}`)
 	var s Snapshot
-	json.Unmarshal([]byte(data), &s) //nolint:errcheck
+	json.Unmarshal(data, &s) //nolint:errcheck
 
 	q, ok := s.AsQuote()
 	if !ok {
@@ -157,9 +261,9 @@ func TestSnapshot_AsQuote(t *testing.T) {
 }
 
 func TestSnapshot_AsQuote_Incomplete(t *testing.T) {
-	data := `{"conid": 1, "31": 100}`
+	data := []byte(`{"conid": 1, "31": 100}`)
 	var s Snapshot
-	json.Unmarshal([]byte(data), &s) //nolint:errcheck
+	json.Unmarshal(data, &s) //nolint:errcheck
 
 	_, ok := s.AsQuote()
 	if ok {
@@ -168,13 +272,13 @@ func TestSnapshot_AsQuote_Incomplete(t *testing.T) {
 }
 
 func TestSnapshot_AsGreeks(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"conid": 1,
 		"7308": 0.65, "7309": 0.03, "7310": -0.05,
 		"7311": 0.15, "7633": 25.5, "7283": 22.0
-	}`
+	}`)
 	var s Snapshot
-	json.Unmarshal([]byte(data), &s) //nolint:errcheck
+	json.Unmarshal(data, &s) //nolint:errcheck
 
 	g, ok := s.AsGreeks()
 	if !ok {
@@ -189,13 +293,13 @@ func TestSnapshot_AsGreeks(t *testing.T) {
 }
 
 func TestSnapshot_AsPnL(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"conid": 1,
 		"73": 50000, "74": 170.5, "75": 500, "80": 2.5,
 		"79": 200, "78": 150, "7292": 17050
-	}`
+	}`)
 	var s Snapshot
-	json.Unmarshal([]byte(data), &s) //nolint:errcheck
+	json.Unmarshal(data, &s) //nolint:errcheck
 
 	p, ok := s.AsPnL()
 	if !ok {
@@ -207,14 +311,14 @@ func TestSnapshot_AsPnL(t *testing.T) {
 }
 
 func TestSnapshot_AsBond(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"conid": 1,
 		"7698": 4.5, "7699": 4.4, "7720": 4.6,
 		"7706": "AAA", "7708": "Corporate", "7705": "Senior",
 		"7715": "2020-01-01", "7714": "2030-12-31"
-	}`
+	}`)
 	var s Snapshot
-	json.Unmarshal([]byte(data), &s) //nolint:errcheck
+	json.Unmarshal(data, &s) //nolint:errcheck
 
 	b, ok := s.AsBond()
 	if !ok {
@@ -229,16 +333,16 @@ func TestSnapshot_AsBond(t *testing.T) {
 }
 
 func TestHistoryResponse_UnmarshalJSON(t *testing.T) {
-	data := `{
+	data := []byte(`{
 		"symbol": "AAPL",
 		"text": "Apple Inc.",
 		"timePeriod": "1d",
 		"data": [
 			{"o": 170.0, "h": 176.0, "l": 169.5, "c": 175.5, "v": 1000000, "t": 1700000000}
 		]
-	}`
+	}`)
 	var hr HistoryResponse
-	if err := json.Unmarshal([]byte(data), &hr); err != nil {
+	if err := json.Unmarshal(data, &hr); err != nil {
 		t.Fatal(err)
 	}
 	if hr.Symbol != "AAPL" {
@@ -263,9 +367,9 @@ func TestHistoryResponse_UnmarshalJSON(t *testing.T) {
 }
 
 func TestHistoryResponse_Empty(t *testing.T) {
-	data := `{}`
+	data := []byte(`{}`)
 	var hr HistoryResponse
-	if err := json.Unmarshal([]byte(data), &hr); err != nil {
+	if err := json.Unmarshal(data, &hr); err != nil {
 		t.Fatal(err)
 	}
 	if hr.Symbol != "" {

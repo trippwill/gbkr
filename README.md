@@ -4,8 +4,8 @@ A Go client library for the [Interactive Brokers](https://www.interactivebrokers
 
 ## Features
 
-- **Two-phase session model** — `Client` for gateway access, `BrokerageClient` for brokerage session capabilities
-- **Narrow capability interfaces** — consumers get purpose-built types (`AccountLister`, `AccountReader`, `PositionReader`, `MarketDataReader`, `ContractReader`, `TradeReader`)
+- **Two-tier session model** — `gbkr.Client` for gateway access, `brokerage.NewSession` for brokerage session capabilities
+- **Handle-based API** — capabilities accessed via purpose-built handle types (`Portfolio`, `Analysis`, `Accounts`, `MarketData`, `Contracts`, `Trades`)
 - **Automatic API pacing** — built-in rate limiting and concurrency control matching IBKR's documented limits
 - **Strongly-typed domain aliases** — `AccountID`, `ConID`, `Currency`, `BarSize`, `TimePeriod` prevent parameter confusion
 - **Structured error model** — const sentinel errors with `errors.Is`/`errors.As` support
@@ -27,7 +27,7 @@ import (
     "log"
 
     "github.com/trippwill/gbkr"
-    "github.com/trippwill/gbkr/models"
+    "github.com/trippwill/gbkr/brokerage"
 )
 
 func main() {
@@ -40,12 +40,12 @@ func main() {
     }
 
     // Elevate to a brokerage session (SSO/DH handshake).
-    bc, err := client.BrokerageSession(context.Background(), &models.SSOInitRequest{})
+    bc, err := brokerage.NewSession(context.Background(), client, &brokerage.SSOInitRequest{})
     if err != nil {
         log.Fatal(err)
     }
 
-    // Use narrow capability interfaces.
+    // Use handle-based API.
     accounts, err := bc.Accounts().List(context.Background())
     if err != nil {
         log.Fatal(err)
@@ -60,8 +60,8 @@ gbkr mirrors the IBKR gateway's two-phase session lifecycle:
 
 | Tier | Type | How to get | Capabilities |
 |------|------|------------|--------------|
-| Gateway | `*Client` | `NewClient(opts...)` | `SessionStatus`, `Portfolio`, `Analysis` |
-| Brokerage | `*BrokerageClient` | `client.BrokerageSession(ctx, req)` | `Accounts`, `Account`, `MarketData`, `Contracts`, `SecurityDefinitions`, `Trades` + all gateway capabilities |
+| Gateway | `*gbkr.Client` | `gbkr.NewClient(opts...)` | `SessionStatus`, `Portfolio`, `Analysis` |
+| Brokerage | `*brokerage.Client` | `brokerage.NewSession(ctx, client, req)` | `Accounts`, `MarketData`, `Contracts`, `SecurityDefinitions`, `Trades` |
 
 ### Capability-to-Path Mapping
 
@@ -69,19 +69,21 @@ gbkr mirrors the IBKR gateway's two-phase session lifecycle:
 |------------|-------------|-----------------|
 | Portfolio | `Client.Portfolio()` | `/portfolio/{accountId}/*` |
 | Analysis | `Client.Analysis()` | `/pa/*` |
-| Accounts | `BrokerageClient.Accounts()` | `/iserver/accounts` |
-| Account | `BrokerageClient.Account()` | `/iserver/account/{id}/*` |
-| MarketData | `BrokerageClient.MarketData()` | `/iserver/marketdata/*` |
-| Contracts | `BrokerageClient.Contracts()` | `/iserver/contract/{conid}/*` |
-| SecurityDefinitions | `BrokerageClient.SecurityDefinitions()` | `/iserver/secdef/*` |
-| Trades | `BrokerageClient.Trades()` | `/iserver/account/trades` |
+| Accounts | `brokerage.Client.Accounts()` | `/iserver/accounts` |
+| MarketData | `brokerage.Client.MarketData()` | `/iserver/marketdata/*` |
+| Contracts | `brokerage.Client.Contracts()` | `/iserver/contract/{conid}/*` |
+| SecurityDefinitions | `brokerage.Client.SecurityDefinitions()` | `/iserver/secdef/*` |
+| Trades | `brokerage.Client.Trades()` | `/iserver/account/trades` |
 
-## Capability Separation
+## Capability Separation (ADR-008)
 
-gbkr currently provides read-only access to the IBKR API. Dangerous capabilities
-(trading, banking) will live in **separate Go modules** (`gbkr/trading`, `gbkr/banking`)
-so that consuming applications must explicitly import them — making the dependency
-visible in `go.mod`. See [ADR-006](https://github.com/trippwill/midwatch.work/blob/main/docs/decisions/006-structural-capability-separation.md) for rationale.
+Types are co-located with their capabilities — no separate `models` package. Shared
+primitives (`AccountID`, `ConID`, `Currency`, etc.) live in `types.go` in the root package;
+brokerage-specific types (`BarSize`, `SnapshotField`, etc.) live in `brokerage/types.go`.
+
+Dangerous capabilities (trading, banking) will live in **separate Go modules**
+(`gbkr/trading`, `gbkr/banking`) so that consuming applications must explicitly import
+them — making the dependency visible in `go.mod`. See [ADR-006](https://github.com/trippwill/midwatch.work/blob/main/docs/decisions/006-structural-capability-separation.md) for rationale.
 
 ## API Pacing
 

@@ -16,7 +16,7 @@ func TestWithHTTPClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.httpClient != custom {
+	if c.t.HTTPClient != custom {
 		t.Error("WithHTTPClient did not set the client")
 	}
 }
@@ -32,12 +32,12 @@ func TestWithLogger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.logger == nil {
+	if c.t.Logger == nil {
 		t.Fatal("logger should not be nil")
 	}
 	// Logger should have gbkr group applied (set in NewClient).
 	// Verify by emitting and checking the handler received it.
-	c.logger.Info("test")
+	c.t.Logger.Info("test")
 	if h.count() != 1 {
 		t.Errorf("expected 1 record, got %d", h.count())
 	}
@@ -51,7 +51,7 @@ func TestWithLogger_DefaultWhenNil(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.logger == nil {
+	if c.t.Logger == nil {
 		t.Error("default logger should not be nil")
 	}
 }

@@ -1,6 +1,6 @@
 // Package gbkr provides a Go client for the IBKR REST API.
 //
-// # Two-Phase Session Model
+// # Two-Tier Session Model
 //
 // The package uses a two-tier client model that mirrors the IBKR gateway's
 // session lifecycle:
@@ -8,27 +8,23 @@
 //  1. [Client] — created via [NewClient]. Provides gateway capabilities:
 //     [Client.SessionStatus], [Client.Portfolio], and [Client.Analysis].
 //
-//  2. [BrokerageClient] — obtained by calling [Client.BrokerageSession], which
-//     performs an SSO/DH handshake to elevate to a full brokerage session.
-//     Provides brokerage capabilities: [BrokerageClient.Accounts],
-//     [BrokerageClient.Account], [BrokerageClient.MarketData],
-//     [BrokerageClient.Contracts], [BrokerageClient.SecurityDefinitions],
-//     and [BrokerageClient.Trades].
-//     Because [BrokerageClient] embeds [*Client], all gateway capabilities
-//     remain available after elevation.
+//  2. [brokerage.Client] — obtained via [brokerage.NewSession], which performs
+//     an SSO/DH handshake to elevate to a full brokerage session.
+//     Provides brokerage capabilities: Accounts, MarketData, Contracts,
+//     SecurityDefinitions, and Trades.
+//     See the [github.com/trippwill/gbkr/brokerage] package for details.
 //
 // # Capability-to-Path Mapping
 //
-//	Capability                 Access Point               IBKR Path Prefix
-//	─────────────────────────  ────────────────────────   ─────────────────────────
-//	Portfolio                  Client.Portfolio()           /portfolio/{accountId}/*
-//	Analysis                   Client.Analysis()            /pa/*
-//	Accounts                   BrokerageClient.Accounts()   /iserver/accounts
-//	Account                    BrokerageClient.Account()    /iserver/account/{id}/*
-//	MarketData                 BrokerageClient.MarketData() /iserver/marketdata/*
-//	Contracts                  BrokerageClient.Contracts()  /iserver/contract/{conid}/*
-//	SecurityDefinitions        BrokerageClient.SecurityDefinitions() /iserver/secdef/*
-//	Trades                     BrokerageClient.Trades()     /iserver/account/trades
+//	Capability                 Access Point                          IBKR Path Prefix
+//	─────────────────────────  ─────────────────────────────────     ─────────────────────────
+//	Portfolio                  Client.Portfolio()                      /portfolio/{accountId}/*
+//	Analysis                   Client.Analysis()                       /pa/*
+//	Accounts                   brokerage.Client.Accounts()             /iserver/accounts
+//	MarketData                 brokerage.Client.MarketData()           /iserver/marketdata/*
+//	Contracts                  brokerage.Client.Contracts()            /iserver/contract/{conid}/*
+//	SecurityDefinitions        brokerage.Client.SecurityDefinitions()  /iserver/secdef/*
+//	Trades                     brokerage.Client.Trades()               /iserver/account/trades
 //
 // # API Pacing
 //

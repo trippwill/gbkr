@@ -12,7 +12,7 @@ type Option func(*Client) error
 // WithBaseURL sets the IBKR API base URL.
 func WithBaseURL(url string) Option {
 	return func(c *Client) error {
-		c.baseURL = url
+		c.t.BaseURL = url
 		return nil
 	}
 }
@@ -20,7 +20,7 @@ func WithBaseURL(url string) Option {
 // WithHTTPClient sets a custom HTTP client for transport.
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) error {
-		c.httpClient = hc
+		c.t.HTTPClient = hc
 		return nil
 	}
 }
@@ -29,7 +29,7 @@ func WithHTTPClient(hc *http.Client) Option {
 // Useful for local gateway connections.
 func WithInsecureTLS() Option {
 	return func(c *Client) error {
-		c.httpClient = &http.Client{
+		c.t.HTTPClient = &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true, //nolint:gosec // intentional for local gateway
@@ -68,7 +68,7 @@ func WithPacingObserver(obs PacingObserver) Option {
 // If not set, [slog.Default] is used.
 func WithLogger(l *slog.Logger) Option {
 	return func(c *Client) error {
-		c.logger = l
+		c.t.Logger = l
 		return nil
 	}
 }

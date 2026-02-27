@@ -1,8 +1,8 @@
-package models
+package brokerage
 
 import "fmt"
 
-// Error is a string-based sentinel error type for the models package.
+// Error is a string-based sentinel error type for the brokerage package.
 type Error string
 
 func (e Error) Error() string { return string(e) }

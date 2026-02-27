@@ -1,4 +1,4 @@
-package models
+package brokerage
 
 import (
 	"errors"
@@ -265,27 +265,9 @@ func TestValidationError_As(t *testing.T) {
 	}
 }
 
-func TestTypeAlias_String(t *testing.T) {
-	tests := []struct {
-		name string
-		got  string
-		want string
-	}{
-		{"AccountID", AccountID("U1234567").String(), "U1234567"},
-		{"ConID", ConID(12345).String(), "12345"},
-		{"Currency", Currency("USD").String(), "USD"},
-		{"Exchange", Exchange("NASDAQ").String(), "NASDAQ"},
-		{"OrderID", OrderID("ord-123").String(), "ord-123"},
-		{"AlertID", AlertID("alert-456").String(), "alert-456"},
-		{"SnapshotField", FieldLast.String(), "31"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.got != tt.want {
-				t.Errorf("%s.String() = %q, want %q", tt.name, tt.got, tt.want)
-			}
-		})
+func TestSnapshotField_String(t *testing.T) {
+	if FieldLast.String() != "31" {
+		t.Errorf("FieldLast.String() = %q, want %q", FieldLast.String(), "31")
 	}
 }
 

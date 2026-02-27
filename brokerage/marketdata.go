@@ -1,11 +1,80 @@
-package models
+package brokerage
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/trippwill/gbkr"
+	"github.com/trippwill/gbkr/internal/jx"
 )
+
+// MarketData provides read access to IBKR market data.
+// IBKR path prefix: /iserver/marketdata/*
+type MarketData struct {
+	c *Client
+}
+
+// MarketData returns a [*MarketData] handle.
+func (c *Client) MarketData() *MarketData {
+	return &MarketData{c: c}
+}
+
+// Snapshot returns a live market data snapshot
+// (GET /iserver/marketdata/snapshot).
+func (m *MarketData) Snapshot(ctx context.Context, params SnapshotParams) ([]Snapshot, error) {
+	start := time.Now()
+	q := url.Values{}
+	if len(params.ConIDs) > 0 {
+		ids := make([]string, len(params.ConIDs))
+		for i, id := range params.ConIDs {
+			ids[i] = fmt.Sprintf("%d", int(id))
+		}
+		q.Set("conids", strings.Join(ids, ","))
+	}
+	if len(params.Fields) > 0 {
+		fs := make([]string, len(params.Fields))
+		for i, f := range params.Fields {
+			fs[i] = f.String()
+		}
+		q.Set("fields", strings.Join(fs, ","))
+	}
+
+	var result []Snapshot
+	err := m.c.doGet(ctx, "/iserver/marketdata/snapshot", q, &result)
+	m.c.emitOp(ctx, gbkr.OpMarketDataSnapshot, err, time.Since(start))
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// History returns historical OHLC bar data
+// (GET /iserver/marketdata/history).
+func (m *MarketData) History(ctx context.Context, params HistoryParams) (*HistoryResponse, error) {
+	start := time.Now()
+	q := url.Values{}
+	q.Set("conid", fmt.Sprintf("%d", int(params.ConID)))
+	q.Set("period", params.Period.String())
+	q.Set("bar", params.Bar.String())
+	if params.Exchange != "" {
+		q.Set("exchange", params.Exchange.String())
+	}
+
+	var result HistoryResponse
+	err := m.c.doGet(ctx, "/iserver/marketdata/history", q, &result)
+	m.c.emitOp(ctx, gbkr.OpMarketDataHistory, err, time.Since(start),
+		slog.Int64("conid", int64(params.ConID)))
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
 
 // FieldValue wraps a raw JSON value from a snapshot response.
 // Zero-value is safe: an absent field returns zero/empty from all accessors.
@@ -89,7 +158,7 @@ var _ fmt.Stringer = FieldValue{}
 
 // SnapshotParams are query parameters for GET /iserver/marketdata/snapshot.
 type SnapshotParams struct {
-	ConIDs []ConID         // Contract IDs to query
+	ConIDs []gbkr.ConID    // Contract IDs to query
 	Fields []SnapshotField // Field codes to return
 }
 
@@ -97,9 +166,9 @@ type SnapshotParams struct {
 // Metadata fields (ConID, ServerID, UpdateTime) are always populated.
 // Dynamic market data fields are accessed via Get.
 type Snapshot struct {
-	ConID      ConID  // Contract identifier.
-	ServerID   string // Internal server ID. (API: "server_id")
-	UpdateTime int64  // Last update epoch timestamp. (API: "_updated")
+	ConID      gbkr.ConID // Contract identifier.
+	ServerID   string     // Internal server ID. (API: "server_id")
+	UpdateTime int64      // Last update epoch timestamp. (API: "_updated")
 	fields     map[SnapshotField]json.RawMessage
 }
 
@@ -136,7 +205,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	if raw, ok := all["conid"]; ok {
 		var id int
 		if json.Unmarshal(raw, &id) == nil {
-			s.ConID = ConID(id)
+			s.ConID = gbkr.ConID(id)
 		}
 		delete(all, "conid")
 	}
@@ -279,10 +348,10 @@ func (s Snapshot) AsBond() (BondSnapshot, bool) {
 
 // HistoryParams are query parameters for GET /iserver/marketdata/history.
 type HistoryParams struct {
-	ConID    ConID      // Contract ID.
-	Period   TimePeriod // Duration of the request (e.g., Period(1, PeriodDays)).
-	Bar      BarSize    // Bar size (e.g., Bar(5, BarMinutes)).
-	Exchange Exchange   // Optional exchange filter.
+	ConID    gbkr.ConID    // Contract ID.
+	Period   TimePeriod    // Duration of the request (e.g., Period(1, PeriodDays)).
+	Bar      BarSize       // Bar size (e.g., Bar(5, BarMinutes)).
+	Exchange gbkr.Exchange // Optional exchange filter.
 }
 
 // HistoryResponse is the response for GET /iserver/marketdata/history.
@@ -303,9 +372,9 @@ func (h *HistoryResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	h.Symbol = deref(raw.Symbol)
-	h.Text = deref(raw.Text)
-	h.TimePeriod = deref(raw.TimePeriod)
+	h.Symbol = jx.Deref(raw.Symbol)
+	h.Text = jx.Deref(raw.Text)
+	h.TimePeriod = jx.Deref(raw.TimePeriod)
 	h.Bars = raw.Bars
 	return nil
 }
@@ -332,11 +401,11 @@ func (b *HistoryBar) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	b.Open = deref(raw.Open)
-	b.High = deref(raw.High)
-	b.Low = deref(raw.Low)
-	b.Close = deref(raw.Close)
-	b.Volume = deref(raw.Volume)
-	b.Time = deref(raw.Time)
+	b.Open = jx.Deref(raw.Open)
+	b.High = jx.Deref(raw.High)
+	b.Low = jx.Deref(raw.Low)
+	b.Close = jx.Deref(raw.Close)
+	b.Volume = jx.Deref(raw.Volume)
+	b.Time = jx.Deref(raw.Time)
 	return nil
 }

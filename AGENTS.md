@@ -33,29 +33,34 @@ go fmt ./...                      # format code
 ### Package Layout
 
 ```
-doc.go               # Package documentation
-gbkr.go              # Core Client struct, HTTP transport (doGet, doPost)
-gbkr_err.go          # Error type, sentinel errors, APIError
+gbkr.go              # Client struct, NewClient, Transport() accessor
+gbkr_err.go          # Error type, ErrBaseURLRequired, re-exported APIError/ErrAPIRequest
 options.go           # Functional options (WithBaseURL, WithHTTPClient, WithLogger, etc.)
 operation.go         # Operation type, Op* constants, emitOp helper (ADR-007)
-auth.go              # SessionClient interface + Session(c) constructor
-accounts.go          # AccountLister + AccountReader interfaces + constructors
-positions.go         # PositionReader interface + Positions(c, id) constructor
-marketdata.go        # MarketDataReader interface + MarketData(c) constructor
-trades.go            # TradeReader interface + BrokerageClient.Trades() method
-contracts.go         # ContractReader interface + BrokerageClient.Contracts() method
-example_test.go      # Go doc examples for capability constructors (package gbkr_test)
-models/
+auth.go              # Client.SessionStatus() + SessionStatus DTO
+portfolio.go         # Portfolio handle + DTOs (Position, PortfolioSummary, Ledger)
+analysis.go          # Analysis handle + DTOs (Transaction, TransactionHistory*)
+cache.go             # ttlCache, Cached[T]
+pacing.go            # PacingPolicy, PacingObserver, pacing rules
+pacing_err.go        # ErrPacingWait
+types.go             # Shared primitives: AccountID, ConID, Currency, Exchange, etc.
+doc.go               # Package documentation
+brokerage/
   doc.go             # Package documentation
-  json.go            # Generic deref[T] helper
-  types.go           # Strongly-typed aliases: AccountID, ConID, Currency, Exchange, OrderID, AlertID, BarSize, TimePeriod
-  types_err.go       # Validation error sentinels and constructors for BarSize/TimePeriod
-  auth.go            # SessionStatus, SSOInitRequest
-  accounts.go        # AccountList, AccountSummary, PnLPartitioned
-  positions.go       # Position (incl. option fields), PortfolioSummary, Ledger
-  marketdata.go      # SnapshotParams, Snapshot, HistoryParams, HistoryResponse
-  trades.go          # TradeExecution, Transaction, TransactionHistoryRequest/Response
-  contracts.go       # ContractDetails, ContractSearchResult
+  brokerage.go       # brokerage.Client, NewSession, SSOInitRequest
+  accounts.go        # Accounts, Account + DTOs
+  contracts.go       # Contracts + DTOs (ContractDetails, ContractSearchResult)
+  marketdata.go      # MarketData + DTOs + SnapshotField constants
+  secdef.go          # SecurityDefinitions
+  trades.go          # Trades + TradeExecution DTO
+  types.go           # BarSize, TimePeriod, SnapshotField + 100+ constants
+  types_err.go       # ValidationError for BarSize/TimePeriod
+internal/
+  transport/
+    transport.go     # Transport struct, Get, Post, doRequest, EmitOp
+    transport_err.go # APIError, ErrAPIRequest
+  jx/
+    jx.go            # Deref[T] JSON helper
 apispec/
   apispec.go         # Embedded OpenAPI spec (api-docs.json)
   api-docs.json      # IBKR Client Portal API specification
@@ -65,12 +70,22 @@ cmd/
 gateway/             # Container config for local IBKR gateway (not a Go package)
 ```
 
-### Capability Separation
+### Capability Separation (ADR-008)
 
-There is no runtime permission system. Dangerous capabilities (trading, banking) will
-live in separate Go modules (`gbkr/trading`, `gbkr/banking`) within the same repository,
-each with their own `go.mod`. This makes the dependency visible in any consumer's `go.mod`.
-See ADR-006 for the rationale.
+The package uses a two-tier client model mirroring the IBKR gateway session lifecycle:
+
+1. **`gbkr.Client`** — created via `NewClient(opts...)`. Provides gateway capabilities:
+   `SessionStatus`, `Portfolio`, and `Analysis`.
+
+2. **`brokerage.Client`** — obtained via `brokerage.NewSession(ctx, client, req)`, which
+   performs an SSO/DH handshake to elevate to a full brokerage session. Provides brokerage
+   capabilities: `Accounts`, `MarketData`, `Contracts`, `SecurityDefinitions`, and `Trades`.
+
+DTOs are co-located with their capability (no separate `models/` package). Shared
+primitives (`AccountID`, `ConID`, `Currency`, etc.) live in `types.go` in the root package.
+
+Dangerous capabilities (trading, banking) will live in **separate Go modules**
+(`gbkr/trading`, `gbkr/banking`) within the same repository. See ADR-006 for the rationale.
 
 ### Operation Event Sourcing
 
