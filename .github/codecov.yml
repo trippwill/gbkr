@@ -30,7 +30,11 @@ component_management:
       name: gbkr
       paths:
         - "*.go"
-    - component_id: models
-      name: models
+    - component_id: brokerage
+      name: brokerage
       paths:
-        - "models/**"
+        - "brokerage/**"
+    - component_id: transport
+      name: transport
+      paths:
+        - "internal/transport/**"
