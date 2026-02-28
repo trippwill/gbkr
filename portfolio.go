@@ -311,3 +311,72 @@ func (p *Portfolio) Ledger(ctx context.Context) (*Ledger, error) {
 	}
 	return &result, nil
 }
+
+// Allocation represents the asset allocation for a portfolio account.
+type Allocation struct {
+	AssetClass map[AssetClass]AllocationEntry
+	Sector     map[string]AllocationEntry
+	Group      map[string]AllocationEntry
+}
+
+// AllocationEntry holds the long and short values for an allocation bucket.
+type AllocationEntry struct {
+	Long  float64
+	Short float64
+}
+
+// UnmarshalJSON implements [json.Unmarshaler].
+func (a *Allocation) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		AssetClass map[string]map[string]float64 `json:"assetClass"`
+		Sector     map[string]map[string]float64 `json:"sector"`
+		Group      map[string]map[string]float64 `json:"group"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	a.AssetClass = decodeAllocationMap[AssetClass](raw.AssetClass)
+	a.Sector = decodeAllocationMap[string](raw.Sector)
+	a.Group = decodeAllocationMap[string](raw.Group)
+	return nil
+}
+
+func decodeAllocationMap[K ~string](m map[string]map[string]float64) map[K]AllocationEntry {
+	if len(m) == 0 {
+		return nil
+	}
+	result := make(map[K]AllocationEntry, len(m))
+	for k, v := range m {
+		result[K(k)] = AllocationEntry{
+			Long:  v["long"],
+			Short: v["short"],
+		}
+	}
+	return result
+}
+
+// Allocation returns the portfolio allocation breakdown
+// (GET /portfolio/{accountId}/allocation).
+func (p *Portfolio) Allocation(ctx context.Context) (*Allocation, error) {
+	start := time.Now()
+	var result Allocation
+	path := fmt.Sprintf("/portfolio/%s/allocation", url.PathEscape(string(p.accountID)))
+	err := p.c.doGet(ctx, path, nil, &result)
+	p.c.emitOp(ctx, OpPortfolioAllocation, err, time.Since(start),
+		slog.String("account_id", string(p.accountID)))
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// InvalidatePositions clears the gateway's cached position data
+// (POST /portfolio/{accountId}/positions/invalidate).
+func (p *Portfolio) InvalidatePositions(ctx context.Context) error {
+	start := time.Now()
+	path := fmt.Sprintf("/portfolio/%s/positions/invalidate", url.PathEscape(string(p.accountID)))
+	err := p.c.doPost(ctx, path, nil, nil)
+	p.c.emitOp(ctx, OpPortfolioInvalidatePositions, err, time.Since(start),
+		slog.String("account_id", string(p.accountID)))
+	return err
+}
