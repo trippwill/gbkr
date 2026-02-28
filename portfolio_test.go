@@ -168,3 +168,92 @@ func TestPortfolio_GatewayAccess(t *testing.T) {
 		t.Fatal("expected non-nil Portfolio")
 	}
 }
+
+func TestPortfolio_Allocation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/portfolio/U1234567/allocation" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"assetClass": map[string]any{
+				"STK": map[string]any{"long": 85000.0, "short": 0.0},
+				"OPT": map[string]any{"long": 5000.0, "short": -2000.0},
+			},
+			"sector": map[string]any{
+				"Technology": map[string]any{"long": 50000.0, "short": 0.0},
+			},
+			"group": map[string]any{
+				"US": map[string]any{"long": 90000.0, "short": -2000.0},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pr := c.Portfolio("U1234567")
+
+	alloc, err := pr.Allocation(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	stk, ok := alloc.AssetClass[AssetStock]
+	if !ok {
+		t.Fatal("missing STK in AssetClass")
+	}
+	if stk.Long != 85000 {
+		t.Errorf("STK long = %f, want 85000", stk.Long)
+	}
+	tech, ok := alloc.Sector["Technology"]
+	if !ok {
+		t.Fatal("missing Technology in Sector")
+	}
+	if tech.Long != 50000 {
+		t.Errorf("Technology long = %f", tech.Long)
+	}
+	us, ok := alloc.Group["US"]
+	if !ok {
+		t.Fatal("missing US in Group")
+	}
+	if us.Short != -2000 {
+		t.Errorf("US short = %f", us.Short)
+	}
+}
+
+func TestAllocation_UnmarshalJSON_Empty(t *testing.T) {
+	data := `{}`
+	var a Allocation
+	if err := json.Unmarshal([]byte(data), &a); err != nil {
+		t.Fatal(err)
+	}
+	if a.AssetClass != nil {
+		t.Errorf("AssetClass should be nil, got %v", a.AssetClass)
+	}
+}
+
+func TestPortfolio_InvalidatePositions(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/portfolio/U1234567/positions/invalidate" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(WithBaseURL(srv.URL), WithRateLimit(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pr := c.Portfolio("U1234567")
+
+	err = pr.InvalidatePositions(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
