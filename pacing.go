@@ -38,6 +38,9 @@ var ibkrPacingTable = []pacingRule{
 	{pathPrefix: "/iserver/scanner/params", method: "GET", isRateLimit: true, interval: 15 * time.Minute, burst: 1},
 	{pathPrefix: "/iserver/scanner/run", method: "POST", isRateLimit: true, interval: time.Second, burst: 1},
 
+	// /iserver/reauthenticate
+	{pathPrefix: "/iserver/reauthenticate", method: "POST", isRateLimit: true, interval: 10 * time.Second, burst: 1},
+
 	// /fyi (longest paths first)
 	{pathPrefix: "/fyi/deliveryoptions/device", method: "POST", isRateLimit: true, interval: time.Second, burst: 1},
 	{pathPrefix: "/fyi/deliveryoptions/email", method: "PUT", isRateLimit: true, interval: time.Second, burst: 1},
@@ -65,7 +68,10 @@ var ibkrPacingTable = []pacingRule{
 	{pathPrefix: "/sso/validate", method: "GET", isRateLimit: true, interval: time.Minute, burst: 1},
 
 	// /tickle
-	{pathPrefix: "/tickle", method: "GET", isRateLimit: true, interval: time.Second, burst: 1},
+	{pathPrefix: "/tickle", method: "POST", isRateLimit: true, interval: time.Second, burst: 1},
+
+	// /logout
+	{pathPrefix: "/logout", method: "POST", isRateLimit: true, interval: time.Minute, burst: 1},
 }
 
 // pathLimiter holds the runtime limiter for a single pacing rule.

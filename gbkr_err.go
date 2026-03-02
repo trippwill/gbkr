@@ -9,7 +9,15 @@ type Error string
 func (e Error) Error() string { return string(e) }
 
 // Sentinel errors.
-const ErrBaseURLRequired = Error("base URL is required: use WithBaseURL")
+const (
+	ErrBaseURLRequired = Error("base URL is required: use WithBaseURL")
+	ErrLogoutFailed    = Error("logout was not successful")
+)
+
+// TickleError indicates the tickle keepalive was rejected.
+type TickleError string
+
+func (e TickleError) Error() string { return "tickle failed: " + string(e) }
 
 // APIError represents a non-2xx response from the IBKR API.
 // Re-exported from the internal transport package.

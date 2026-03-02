@@ -8,7 +8,8 @@ import (
 	"github.com/trippwill/gbkr/internal/jx"
 )
 
-// SessionStatus is the response for POST /iserver/auth/ssodh/init and POST /iserver/auth/status.
+// SessionStatus is the response for authentication status endpoints
+// (POST /iserver/auth/status, POST /iserver/auth/ssodh/init, POST /iserver/reauthenticate).
 type SessionStatus struct {
 	// Authenticated indicates if the session is authenticated.
 	Authenticated bool
@@ -68,4 +69,55 @@ func (c *Client) SessionStatus(ctx context.Context) (*SessionStatus, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// Logout ends the current brokerage session (POST /logout).
+// Returns an error if the gateway reports an unsuccessful logout.
+func (c *Client) Logout(ctx context.Context) error {
+	start := time.Now()
+	var result struct {
+		Status *bool `json:"status"`
+	}
+	err := c.doPost(ctx, "/logout", nil, &result)
+	c.emitOp(ctx, OpLogout, err, time.Since(start))
+	if err != nil {
+		return err
+	}
+	if result.Status != nil && !*result.Status {
+		return ErrLogoutFailed
+	}
+	return nil
+}
+
+// Reauthenticate triggers re-authentication of the current session
+// (POST /iserver/reauthenticate).
+func (c *Client) Reauthenticate(ctx context.Context) (*SessionStatus, error) {
+	start := time.Now()
+	var result SessionStatus
+	err := c.doPost(ctx, "/iserver/reauthenticate", nil, &result)
+	c.emitOp(ctx, OpReauthenticate, err, time.Since(start))
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Tickle sends a keepalive ping to prevent session timeout (POST /tickle).
+// Returns the SSO expiry time in milliseconds on success, or an error if the
+// gateway reports a failure.
+func (c *Client) Tickle(ctx context.Context) (int, error) {
+	start := time.Now()
+	var result struct {
+		SSOExpires int    `json:"ssoExpires"`
+		Error      string `json:"error"`
+	}
+	err := c.doPost(ctx, "/tickle", nil, &result)
+	c.emitOp(ctx, OpTickle, err, time.Since(start))
+	if err != nil {
+		return 0, err
+	}
+	if result.Error != "" {
+		return 0, TickleError(result.Error)
+	}
+	return result.SSOExpires, nil
 }
