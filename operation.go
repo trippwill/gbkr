@@ -12,6 +12,9 @@ type Operation string
 
 const (
 	OpSessionStatus                Operation = "SessionStatus"
+	OpLogout                       Operation = "Logout"
+	OpReauthenticate               Operation = "Reauthenticate"
+	OpTickle                       Operation = "Tickle"
 	OpBrokerageSession             Operation = "BrokerageSession"
 	OpListAccounts                 Operation = "ListAccounts"
 	OpAccountPnL                   Operation = "AccountPnL"
