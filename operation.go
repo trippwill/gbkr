@@ -32,6 +32,7 @@ const (
 	OpPortfolioAccounts            Operation = "PortfolioAccounts"
 	OpPortfolioAllocation          Operation = "PortfolioAllocation"
 	OpPortfolioInvalidatePositions Operation = "PortfolioInvalidatePositions"
+	OpTradingSchedule              Operation = "TradingSchedule"
 )
 
 // emitOp logs a structured operation event via the client's slog logger.
