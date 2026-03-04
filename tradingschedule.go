@@ -39,9 +39,7 @@ type TradingSession struct {
 }
 
 func (ts *TradingSchedule) UnmarshalJSON(data []byte) error {
-	type tradingScheduleAlias TradingSchedule
 	var aux struct {
-		tradingScheduleAlias
 		ExchangeTimezone *string               `json:"exchange_time_zone"`
 		Schedules        map[string]TradingDay `json:"schedules"`
 	}
