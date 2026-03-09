@@ -30,62 +30,41 @@ go fmt ./...                      # format code
 
 ## Architecture
 
-### Package Layout
+### Package Roles
 
-```
-gbkr.go              # Client struct, NewClient, Transport() accessor
-gbkr_err.go          # Error type, ErrBaseURLRequired, re-exported APIError/ErrAPIRequest
-options.go           # Functional options (WithBaseURL, WithHTTPClient, WithLogger, etc.)
-operation.go         # Operation type, Op* constants, emitOp helper (ADR-007)
-auth.go              # Client.SessionStatus() + SessionStatus DTO
-portfolio.go         # Portfolio handle + DTOs (Position, PortfolioSummary, Ledger)
-analysis.go          # Analysis handle + DTOs (Transaction, TransactionHistory*)
-cache.go             # ttlCache, Cached[T]
-pacing.go            # PacingPolicy, PacingObserver, pacing rules
-pacing_err.go        # ErrPacingWait
-types.go             # Shared primitives: AccountID, ConID, Currency, Exchange, etc.
-doc.go               # Package documentation
-brokerage/
-  doc.go             # Package documentation
-  brokerage.go       # brokerage.Client, NewSession, SSOInitRequest
-  accounts.go        # Accounts, Account + DTOs
-  contracts.go       # Contracts + DTOs (ContractDetails, ContractSearchResult)
-  marketdata.go      # MarketData + DTOs + SnapshotField constants
-  secdef.go          # SecurityDefinitions
-  trades.go          # Trades + TradeExecution DTO
-  types.go           # BarSize, TimePeriod, SnapshotField + 100+ constants
-  types_err.go       # ValidationError for BarSize/TimePeriod
-internal/
-  transport/
-    transport.go     # Transport struct, Get, Post, doRequest, EmitOp
-    transport_err.go # APIError, ErrAPIRequest
-  jx/
-    jx.go            # Deref[T] JSON helper
-apispec/
-  apispec.go         # Embedded OpenAPI spec (api-docs.json)
-  api-docs.json      # IBKR Client Portal API specification
-cmd/
-  gbkr/
-    main.go          # CLI test harness
-gateway/             # Container config for local IBKR gateway (not a Go package)
-```
+**`gbkr` (root package)** — Gateway-level client and shared primitives.
+`Client` wraps an internal HTTP transport and provides gateway capabilities that do not require brokerage session elevation: session auth (status, logout, reauthenticate, tickle), portfolio (positions, summary, ledger, allocation), analysis (transaction history with TTL caching), portfolio account discovery, and trading schedule lookup.
+Also defines: functional options (`WithBaseURL`, `WithHTTPClient`, `WithInsecureTLS`, `WithRateLimit`, `WithPacingObserver`, `WithLogger`), `Operation` constants for event sourcing, `PacingPolicy` with per-endpoint rate limits, `Cached[T]` for time-stamped cache results, and shared type aliases (`AccountID`, `ConID`, `Currency`, `Exchange`, etc.).
+
+**`brokerage/`** — Elevated brokerage session capabilities.
+`brokerage.Client` is obtained via `brokerage.NewSession(ctx, client, req)`, which performs an SSO/DH handshake. Provides: account listing and summary, market data (snapshots and history), contract info and search, security definitions, and trade history. DTOs are co-located here (no separate `models/` package). References shared primitives as `gbkr.AccountID`, `gbkr.ConID`, etc.
+
+**`internal/transport/`** — HTTP plumbing shared by both tiers.
+`Transport` struct holds base URL, HTTP client, logger, and request hook. Provides `Get`, `Post`, and `EmitOp` methods. Defines `APIError` and `ErrAPIRequest` (re-exported by the root package). Invisible to external consumers.
+
+**`internal/jx/`** — `Deref[T]` generic helper for safe pointer dereference in JSON unmarshaling.
+
+**`cmd/gbkr/`** — CLI test harness demonstrating two-tier session model.
+
+**`gateway/`** — Container config for running the IBKR Client Portal Gateway locally (Containerfile, conf.yaml, helper scripts). Not a Go package.
 
 ### Capability Separation (ADR-008)
 
 The package uses a two-tier client model mirroring the IBKR gateway session lifecycle:
 
 1. **`gbkr.Client`** — created via `NewClient(opts...)`. Provides gateway capabilities:
-   `SessionStatus`, `Portfolio`, and `Analysis`.
+   `SessionStatus`, `Logout`, `Reauthenticate`, `Tickle`, `Portfolio`, `Analysis`,
+   `PortfolioAccounts`, and `TradingSchedule`.
 
 2. **`brokerage.Client`** — obtained via `brokerage.NewSession(ctx, client, req)`, which
    performs an SSO/DH handshake to elevate to a full brokerage session. Provides brokerage
    capabilities: `Accounts`, `MarketData`, `Contracts`, `SecurityDefinitions`, and `Trades`.
 
-DTOs are co-located with their capability (no separate `models/` package). Shared
+DTOs are co-located with their capability. Shared
 primitives (`AccountID`, `ConID`, `Currency`, etc.) live in `types.go` in the root package.
 
 Dangerous capabilities (trading, banking) will live in **separate Go modules**
-(`gbkr/trading`, `gbkr/banking`) within the same repository. See ADR-006 for the rationale.
+(e.g., `gbkr/brokerage/trade`) within the same repository. See ADR-006 and ADR-008.
 
 ### Operation Event Sourcing
 
@@ -123,7 +102,7 @@ under the `"gbkr"` group (see ADR-007). Key points:
 ### Naming Conventions
 - Avoid "Get" prefix for getters — use noun-like names (e.g., `Summary()` not `GetSummary()`)
 - Initialisms should be consistently cased: `ID`, `URL`, `HTTP` (exported) or `id`, `url`, `http` (unexported)
-- Don't repeat package name in function names (e.g., `models.Bar()` not `models.NewBarSize()`)
+- Don't repeat package name in exported identifiers
 
 ### Commits & Pull Requests
 - Run `mise run precommit` before committing
