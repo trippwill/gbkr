@@ -5,7 +5,6 @@ parsers:
     partials_as_hits: true
 ignore:
   - "cmd/**"
-  - "apispec/**"
   - "**/*_string.go"
   - "**/*_err.go"
 coverage:
