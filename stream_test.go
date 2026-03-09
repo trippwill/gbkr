@@ -264,10 +264,11 @@ func TestStream_Notifications(t *testing.T) {
 	}
 	defer stream.Close()
 
-	ch, err := stream.Notifications()
+	ch, cancelSub, err := stream.Notifications()
 	if err != nil {
 		t.Fatalf("Notifications: %v", err)
 	}
+	defer cancelSub()
 
 	select {
 	case n := <-ch:
@@ -298,10 +299,11 @@ func TestStream_Notifications_ChannelCloses(t *testing.T) {
 		t.Fatalf("Stream: %v", err)
 	}
 
-	ch, err := stream.Notifications()
+	ch, cancelSub, err := stream.Notifications()
 	if err != nil {
 		t.Fatalf("Notifications: %v", err)
 	}
+	_ = cancelSub
 
 	stream.Close()
 
@@ -334,7 +336,7 @@ func TestStream_Notifications_ClosedStream(t *testing.T) {
 
 	stream.Close()
 
-	_, err = stream.Notifications()
+	_, _, err = stream.Notifications()
 	if err == nil {
 		t.Fatal("expected error on closed stream")
 	}
@@ -365,14 +367,16 @@ func TestStream_Notifications_MultipleCalls(t *testing.T) {
 	}
 	defer stream.Close()
 
-	ch1, err := stream.Notifications()
+	ch1, cancel1, err := stream.Notifications()
 	if err != nil {
 		t.Fatalf("Notifications 1: %v", err)
 	}
-	ch2, err := stream.Notifications()
+	defer cancel1()
+	ch2, cancel2, err := stream.Notifications()
 	if err != nil {
 		t.Fatalf("Notifications 2: %v", err)
 	}
+	defer cancel2()
 
 	// Both channels should receive the same notification (fan-out).
 	for i, ch := range []<-chan gbkr.Notification{ch1, ch2} {
@@ -384,5 +388,147 @@ func TestStream_Notifications_MultipleCalls(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatalf("ch%d: timed out", i+1)
 		}
+	}
+}
+
+func TestStream_AccountSummary(t *testing.T) {
+	srv, _ := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		// Read the subscribe command.
+		_, _, _ = conn.Read(context.Background())
+
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"sbd+U1234567","totalCashValue":50000.00,"netLiquidation":150000.00}`
+		if err := conn.Write(context.Background(), websocket.MessageText, []byte(msg)); err != nil {
+			return
+		}
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	client := newStreamTestClient(t, srv.URL)
+	stream, err := client.Stream(context.Background())
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	defer stream.Close()
+
+	ch, cancel, err := stream.AccountSummary("U1234567")
+	if err != nil {
+		t.Fatalf("AccountSummary: %v", err)
+	}
+	defer cancel()
+
+	select {
+	case update := <-ch:
+		if update.AccountID != "U1234567" {
+			t.Errorf("AccountID = %q, want %q", update.AccountID, "U1234567")
+		}
+		if update.Get("totalCashValue") == nil {
+			t.Error("missing totalCashValue field")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for account summary")
+	}
+}
+
+func TestStream_PortfolioPnL(t *testing.T) {
+	srv, _ := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		_, _, _ = conn.Read(context.Background())
+
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"spl+U1234567","dpl":-500.0,"nl":100000.0,"upl":-2100.75,"rpl":850.25,"el":95000.0,"mv":5000.0}`
+		if err := conn.Write(context.Background(), websocket.MessageText, []byte(msg)); err != nil {
+			return
+		}
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	client := newStreamTestClient(t, srv.URL)
+	stream, err := client.Stream(context.Background())
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	defer stream.Close()
+
+	ch, cancel, err := stream.PortfolioPnL("U1234567")
+	if err != nil {
+		t.Fatalf("PortfolioPnL: %v", err)
+	}
+	defer cancel()
+
+	select {
+	case update := <-ch:
+		if update.AccountID != "U1234567" {
+			t.Errorf("AccountID = %q, want %q", update.AccountID, "U1234567")
+		}
+		if update.DailyPnL != -500.0 {
+			t.Errorf("DailyPnL = %f, want -500.0", update.DailyPnL)
+		}
+		if update.UnrealizedPnL != -2100.75 {
+			t.Errorf("UnrealizedPnL = %f, want -2100.75", update.UnrealizedPnL)
+		}
+		if update.RealizedPnL != 850.25 {
+			t.Errorf("RealizedPnL = %f, want 850.25", update.RealizedPnL)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for PnL update")
+	}
+}
+
+func TestStream_Cancel_Unsubscribes(t *testing.T) {
+	received := make(chan string, 10)
+
+	srv, _ := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		for {
+			_, data, err := conn.Read(context.Background())
+			if err != nil {
+				return
+			}
+			received <- string(data)
+		}
+	})
+
+	client := newStreamTestClient(t, srv.URL)
+	stream, err := client.Stream(context.Background())
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	defer stream.Close()
+
+	_, cancel, err := stream.PortfolioPnL("U1234567")
+	if err != nil {
+		t.Fatalf("PortfolioPnL: %v", err)
+	}
+
+	// Drain the subscribe command.
+	select {
+	case msg := <-received:
+		if msg != "spl+U1234567" {
+			t.Errorf("subscribe msg = %q, want %q", msg, "spl+U1234567")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for subscribe command")
+	}
+
+	cancel()
+
+	// Should send unsubscribe command.
+	select {
+	case msg := <-received:
+		if msg != "upl+U1234567" {
+			t.Errorf("unsubscribe msg = %q, want %q", msg, "upl+U1234567")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for unsubscribe command")
 	}
 }

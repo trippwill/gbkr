@@ -72,9 +72,19 @@ func (s *Stream) Close() error {
 	return closeErr
 }
 
-// wsConn returns the underlying WSConn for cross-package subscription.
-// Accessible within the module but unexported from the public API.
+// WsConn returns the underlying [transport.WSConn] for cross-package subscription.
+// The return type is from internal/transport, so external consumers cannot
+// reference it — this method is effectively module-internal.
 func (s *Stream) WsConn() *transport.WSConn { return s.ws }
+
+// EmitOp exposes operation logging for cross-package subscription helpers
+// in the brokerage package.
+func (s *Stream) EmitOp(op Operation, attrs ...slog.Attr) {
+	s.client.emitOp(context.Background(), op, nil, 0, attrs...)
+}
+
+// IsClosed reports whether the stream has been closed.
+func (s *Stream) IsClosed() bool { return s.closed }
 
 func (s *Stream) keepalive(ctx context.Context) {
 	ticker := time.NewTicker(keepaliveInterval)
@@ -103,6 +113,72 @@ func (s *Stream) watchClose(ctx context.Context) {
 	}
 }
 
+// subscribe is the common subscription helper. It registers a topic handler,
+// sends the subscribe command, emits the operation, and returns a cancel
+// function that unsubscribes and closes the channel.
+func subscribe[T any](s *Stream, topic string, bufSize int, dropOnFull bool, parse func(json.RawMessage) (T, error), attrs ...slog.Attr) (<-chan T, func(), error) {
+	if s.closed {
+		return nil, nil, ErrStreamNotConnected
+	}
+
+	ch := make(chan T, bufSize)
+
+	cancelSub := s.ws.Subscribe(topic, func(data json.RawMessage) {
+		v, err := parse(data)
+		if err != nil {
+			s.client.t.Logger.Warn("ws: malformed frame",
+				slog.String("topic", topic),
+				slog.String("error", err.Error()))
+			return
+		}
+		if dropOnFull {
+			select {
+			case ch <- v:
+			default:
+				// Drop oldest to make room.
+				select {
+				case <-ch:
+				default:
+				}
+				ch <- v
+			}
+		} else {
+			ch <- v
+		}
+	})
+
+	// Send subscribe command to gateway.
+	_ = s.ws.Send(context.Background(), topic)
+
+	allAttrs := make([]slog.Attr, 0, 1+len(attrs))
+	allAttrs = append(allAttrs, slog.String("topic", topic))
+	allAttrs = append(allAttrs, attrs...)
+	s.client.emitOp(context.Background(), OpStreamSubscribe, nil, 0, allAttrs...)
+
+	var cancelOnce sync.Once
+	cancelFn := func() {
+		cancelOnce.Do(func() {
+			cancelSub()
+			// Send unsubscribe command using the "u" prefix convention.
+			if len(topic) > 1 {
+				unsub := "u" + topic[1:]
+				_ = s.ws.Send(context.Background(), unsub)
+			}
+			s.client.emitOp(context.Background(), OpStreamUnsubscribe, nil, 0,
+				slog.String("topic", topic))
+			close(ch)
+		})
+	}
+
+	// Auto-close on stream disconnect.
+	go func() {
+		<-s.ws.Done()
+		cancelFn()
+	}()
+
+	return ch, cancelFn, nil
+}
+
 // deriveWSURL converts a REST base URL to a WebSocket URL.
 //
 //	https://host:port/v1/api → wss://host:port/v1/api/ws
@@ -118,6 +194,10 @@ func deriveWSURL(baseURL string) (string, error) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Gateway-level subscriptions
+// ---------------------------------------------------------------------------
+
 // Notification represents a gateway notification message.
 type Notification struct {
 	ID   string `json:"id"`
@@ -125,44 +205,70 @@ type Notification struct {
 	Text string `json:"text"`
 }
 
-// Notifications subscribes to gateway notification messages and returns a
-// channel that receives them. The channel is closed when the stream closes.
+// Notifications subscribes to gateway notification messages. The returned
+// channel receives notifications; call cancel to unsubscribe and close it.
 // Multiple calls return independent channels (fan-out).
-func (s *Stream) Notifications() (<-chan Notification, error) {
-	if s.closed {
-		return nil, ErrStreamNotConnected
-	}
+func (s *Stream) Notifications() (updates <-chan Notification, cancel func(), err error) {
+	return subscribe(s, "ntf", 32, true,
+		func(data json.RawMessage) (Notification, error) {
+			var n Notification
+			return n, json.Unmarshal(data, &n)
+		})
+}
 
-	ch := make(chan Notification, 32)
+// AccountSummaryUpdate represents a streaming account summary update
+// from the gateway topic sbd+{acctId}.
+type AccountSummaryUpdate struct {
+	AccountID AccountID                  `json:"-"`
+	Fields    map[string]json.RawMessage `json:"-"`
+}
 
-	cancelSub := s.ws.Subscribe("ntf", func(data json.RawMessage) {
-		var n Notification
-		if err := json.Unmarshal(data, &n); err != nil {
-			s.client.t.Logger.Warn("ws: malformed ntf frame",
-				slog.String("error", err.Error()))
-			return
-		}
-		select {
-		case ch <- n:
-		default:
-			// Buffer full — drop oldest to make room.
-			select {
-			case <-ch:
-			default:
+// AccountSummary subscribes to account summary updates for the given account.
+// Gateway topic: sbd+{acctId}.
+func (s *Stream) AccountSummary(accountID AccountID) (updates <-chan AccountSummaryUpdate, cancel func(), err error) {
+	topic := "sbd+" + string(accountID)
+	return subscribe(s, topic, 16, true,
+		func(data json.RawMessage) (AccountSummaryUpdate, error) {
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal(data, &raw); err != nil {
+				return AccountSummaryUpdate{}, err
 			}
-			ch <- n
-		}
-	})
+			// Remove metadata fields.
+			delete(raw, "topic")
+			return AccountSummaryUpdate{AccountID: accountID, Fields: raw}, nil
+		},
+		slog.String("account_id", string(accountID)))
+}
 
-	s.client.emitOp(context.Background(), OpStreamSubscribe, nil, 0,
-		slog.String("topic", "ntf"))
+// Get returns the raw JSON value for a field key, or nil if absent.
+func (u *AccountSummaryUpdate) Get(key string) json.RawMessage {
+	return u.Fields[key]
+}
 
-	// Close channel when the stream disconnects.
-	go func() {
-		<-s.ws.Done()
-		cancelSub()
-		close(ch)
-	}()
+// PnLUpdate represents a streaming portfolio P&L update
+// from the gateway topic spl+{acctId}.
+type PnLUpdate struct {
+	AccountID     AccountID `json:"-"`
+	DailyPnL      float64   `json:"dpl"`
+	NetLiquidity  float64   `json:"nl"`
+	UnrealizedPnL float64   `json:"upl"`
+	RealizedPnL   float64   `json:"rpl"`
+	ExcessLiq     float64   `json:"el"`
+	MarginValue   float64   `json:"mv"`
+}
 
-	return ch, nil
+// PortfolioPnL subscribes to portfolio P&L updates for the given account.
+// Gateway topic: spl+{acctId}.
+func (s *Stream) PortfolioPnL(accountID AccountID) (updates <-chan PnLUpdate, cancel func(), err error) {
+	topic := "spl+" + string(accountID)
+	return subscribe(s, topic, 16, true,
+		func(data json.RawMessage) (PnLUpdate, error) {
+			var u PnLUpdate
+			if err := json.Unmarshal(data, &u); err != nil {
+				return PnLUpdate{}, err
+			}
+			u.AccountID = accountID
+			return u, nil
+		},
+		slog.String("account_id", string(accountID)))
 }
