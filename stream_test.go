@@ -104,15 +104,6 @@ func TestClient_Stream_Connect(t *testing.T) {
 }
 
 func TestStream_Close_Idempotent(t *testing.T) {
-	_, _ = testWSServer(t, func(conn *websocket.Conn) {
-		defer conn.Close(websocket.StatusNormalClosure, "")
-		for {
-			if _, _, err := conn.Read(context.Background()); err != nil {
-				return
-			}
-		}
-	})
-
 	srv, _ := testWSServer(t, func(conn *websocket.Conn) {
 		defer conn.Close(websocket.StatusNormalClosure, "")
 		for {
@@ -173,32 +164,24 @@ func TestStream_ContextCancel(t *testing.T) {
 }
 
 func TestStream_Keepalive(t *testing.T) {
-	received := make(chan string, 10)
-
 	srv, _ := testWSServer(t, func(conn *websocket.Conn) {
 		defer conn.Close(websocket.StatusNormalClosure, "")
 		for {
-			_, data, err := conn.Read(context.Background())
-			if err != nil {
+			if _, _, err := conn.Read(context.Background()); err != nil {
 				return
 			}
-			received <- string(data)
 		}
 	})
 
 	client := newStreamTestClient(t, srv.URL)
 	ctx := context.Background()
 
-	// Override keepalive interval for testing by using a short-lived stream.
-	// We can't easily change the interval, so we just verify that the stream
-	// sends tic messages. Since the default is 25s, we'll wait briefly and
-	// verify via Close that the keepalive goroutine exits cleanly.
 	stream, err := client.Stream(ctx)
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
 
-	// Stream is connected; close it and verify no hang.
+	// Verify the keepalive goroutine exits cleanly on Close.
 	stream.Close()
 }
 

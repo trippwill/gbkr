@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/trippwill/gbkr/internal/transport"
@@ -22,7 +23,7 @@ type Stream struct {
 	cancel    context.CancelFunc
 	done      chan struct{}
 	closeOnce sync.Once
-	closed    bool
+	closed    atomic.Bool
 }
 
 // Stream opens a WebSocket connection to the IBKR gateway and returns a
@@ -34,6 +35,7 @@ func (c *Client) Stream(ctx context.Context) (*Stream, error) {
 		return nil, err
 	}
 
+	start := time.Now()
 	ws, err := transport.DialWS(ctx, wsURL, c.t.HTTPClient, c.t.Logger)
 	if err != nil {
 		return nil, err
@@ -48,7 +50,6 @@ func (c *Client) Stream(ctx context.Context) (*Stream, error) {
 		done:   make(chan struct{}),
 	}
 
-	start := time.Now()
 	c.emitOp(ctx, OpStreamConnect, nil, time.Since(start))
 
 	go s.keepalive(ctx)
@@ -62,10 +63,10 @@ func (c *Client) Stream(ctx context.Context) (*Stream, error) {
 func (s *Stream) Close() error {
 	var closeErr error
 	s.closeOnce.Do(func() {
-		s.closed = true
+		s.closed.Store(true)
 		s.cancel()
-		closeErr = s.ws.Close()
 		start := time.Now()
+		closeErr = s.ws.Close()
 		s.client.emitOp(context.Background(), OpStreamDisconnect, nil, time.Since(start))
 	})
 	<-s.done
@@ -83,8 +84,19 @@ func (s *Stream) EmitOp(op Operation, attrs ...slog.Attr) {
 	s.client.emitOp(context.Background(), op, nil, 0, attrs...)
 }
 
-// IsClosed reports whether the stream has been closed.
-func (s *Stream) IsClosed() bool { return s.closed }
+// IsClosed reports whether the stream has been closed explicitly or
+// the underlying WebSocket has disconnected.
+func (s *Stream) IsClosed() bool {
+	if s.closed.Load() {
+		return true
+	}
+	select {
+	case <-s.ws.Done():
+		return true
+	default:
+		return false
+	}
+}
 
 func (s *Stream) keepalive(ctx context.Context) {
 	ticker := time.NewTicker(keepaliveInterval)
@@ -113,22 +125,32 @@ func (s *Stream) watchClose(ctx context.Context) {
 	}
 }
 
+// sendTimeout is the maximum time allowed for a subscribe/unsubscribe send.
+const sendTimeout = 5 * time.Second
+
 // subscribe is the common subscription helper. It registers a topic handler,
 // sends the subscribe command, emits the operation, and returns a cancel
 // function that unsubscribes and closes the channel.
 func subscribe[T any](s *Stream, topic string, bufSize int, dropOnFull bool, parse func(json.RawMessage) (T, error), attrs ...slog.Attr) (<-chan T, func(), error) {
-	if s.closed {
+	if s.IsClosed() {
 		return nil, nil, ErrStreamNotConnected
 	}
 
 	ch := make(chan T, bufSize)
 
-	cancelSub := s.ws.Subscribe(topic, func(data json.RawMessage) {
+	var (
+		cancelSub func()
+		active    *atomic.Bool
+	)
+	cancelSub, active = s.ws.Subscribe(topic, func(data json.RawMessage) {
 		v, err := parse(data)
 		if err != nil {
 			s.client.t.Logger.Warn("ws: malformed frame",
 				slog.String("topic", topic),
 				slog.String("error", err.Error()))
+			return
+		}
+		if !active.Load() {
 			return
 		}
 		if dropOnFull {
@@ -148,7 +170,14 @@ func subscribe[T any](s *Stream, topic string, bufSize int, dropOnFull bool, par
 	})
 
 	// Send subscribe command to gateway.
-	_ = s.ws.Send(context.Background(), topic)
+	sendCtx, sendCancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer sendCancel()
+	if err := s.ws.Send(sendCtx, topic); err != nil {
+		active.Store(false)
+		cancelSub()
+		close(ch)
+		return nil, nil, fmt.Errorf("subscribe %s: %w", topic, err)
+	}
 
 	allAttrs := make([]slog.Attr, 0, 1+len(attrs))
 	allAttrs = append(allAttrs, slog.String("topic", topic))
@@ -158,11 +187,14 @@ func subscribe[T any](s *Stream, topic string, bufSize int, dropOnFull bool, par
 	var cancelOnce sync.Once
 	cancelFn := func() {
 		cancelOnce.Do(func() {
+			active.Store(false)
 			cancelSub()
 			// Send unsubscribe command using the "u" prefix convention.
 			if len(topic) > 1 {
 				unsub := "u" + topic[1:]
-				_ = s.ws.Send(context.Background(), unsub)
+				unsubCtx, unsubCancel := context.WithTimeout(context.Background(), sendTimeout)
+				defer unsubCancel()
+				_ = s.ws.Send(unsubCtx, unsub)
 			}
 			s.client.emitOp(context.Background(), OpStreamUnsubscribe, nil, 0,
 				slog.String("topic", topic))

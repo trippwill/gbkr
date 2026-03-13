@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/coder/websocket"
 )
@@ -23,27 +24,35 @@ type WSConn struct {
 	handlers  sync.Map // topic string → *handlerList
 	done      chan struct{}
 	closeOnce sync.Once
+	cancelCtx context.CancelFunc // cancels the readLoop context
 	logger    *slog.Logger
 }
 
 // handlerList holds fan-out handlers for a single topic.
 type handlerList struct {
 	mu       sync.Mutex
-	handlers map[int]func(json.RawMessage)
+	handlers map[int]*handler
 	nextID   int
 }
 
-func newHandlerList() *handlerList {
-	return &handlerList{handlers: make(map[int]func(json.RawMessage))}
+type handler struct {
+	fn     func(json.RawMessage)
+	active *atomic.Bool // set to false before channel close to prevent send-after-close
 }
 
-func (hl *handlerList) add(fn func(json.RawMessage)) int {
+func newHandlerList() *handlerList {
+	return &handlerList{handlers: make(map[int]*handler)}
+}
+
+func (hl *handlerList) add(fn func(json.RawMessage)) (int, *atomic.Bool) {
+	active := &atomic.Bool{}
+	active.Store(true)
 	hl.mu.Lock()
 	defer hl.mu.Unlock()
 	id := hl.nextID
 	hl.nextID++
-	hl.handlers[id] = fn
-	return id
+	hl.handlers[id] = &handler{fn: fn, active: active}
+	return id, active
 }
 
 func (hl *handlerList) remove(id int) bool {
@@ -56,18 +65,26 @@ func (hl *handlerList) remove(id int) bool {
 func (hl *handlerList) dispatch(data json.RawMessage) {
 	hl.mu.Lock()
 	// Snapshot handlers under lock to avoid holding it during callbacks.
-	fns := make([]func(json.RawMessage), 0, len(hl.handlers))
-	for _, fn := range hl.handlers {
-		fns = append(fns, fn)
+	type entry struct {
+		fn     func(json.RawMessage)
+		active *atomic.Bool
+	}
+	entries := make([]entry, 0, len(hl.handlers))
+	for _, h := range hl.handlers {
+		entries = append(entries, entry{fn: h.fn, active: h.active})
 	}
 	hl.mu.Unlock()
 
-	for _, fn := range fns {
-		fn(data)
+	for _, e := range entries {
+		if e.active.Load() {
+			e.fn(data)
+		}
 	}
 }
 
 // DialWS establishes a WebSocket connection and starts the read loop.
+// The provided ctx is used only for dialing; the read loop runs on an
+// internal context that is cancelled when Close is called.
 func DialWS(ctx context.Context, wsURL string, httpClient *http.Client, logger *slog.Logger) (*WSConn, error) {
 	opts := &websocket.DialOptions{
 		HTTPClient: httpClient,
@@ -78,13 +95,18 @@ func DialWS(ctx context.Context, wsURL string, httpClient *http.Client, logger *
 		return nil, fmt.Errorf("%w: %w", ErrWSClosed, err)
 	}
 
+	// Derive a non-cancelling context from the dial context so the read loop
+	// is not tied to the caller's deadline/cancellation.
+	readCtx, cancelRead := context.WithCancel(context.WithoutCancel(ctx))
+
 	ws := &WSConn{
-		conn:   conn,
-		done:   make(chan struct{}),
-		logger: logger,
+		conn:      conn,
+		done:      make(chan struct{}),
+		cancelCtx: cancelRead,
+		logger:    logger,
 	}
 
-	go ws.readLoop(ctx)
+	go ws.readLoop(readCtx)
 
 	return ws, nil
 }
@@ -108,18 +130,21 @@ func (ws *WSConn) Send(ctx context.Context, msg string) error {
 }
 
 // Subscribe registers a handler for messages matching the given topic.
-// Returns a cancel function that deregisters the handler.
+// Returns a cancel function that deregisters the handler, and an active
+// flag that is set to false before deregistration. Callers that close
+// channels in their cancel path should call active.Store(false) first
+// to prevent in-flight dispatch from sending on a closed channel.
 // Multiple handlers may be registered for the same topic (fan-out).
-func (ws *WSConn) Subscribe(topic string, handler func(json.RawMessage)) (cancel func()) {
+func (ws *WSConn) Subscribe(topic string, fn func(json.RawMessage)) (cancel func(), active *atomic.Bool) {
 	actual, _ := ws.handlers.LoadOrStore(topic, newHandlerList())
 	hl := actual.(*handlerList)
-	id := hl.add(handler)
+	id, active := hl.add(fn)
 
 	return func() {
 		if empty := hl.remove(id); empty {
 			ws.handlers.Delete(topic)
 		}
-	}
+	}, active
 }
 
 // Done returns a channel that is closed when the WebSocket connection is lost.
@@ -132,6 +157,7 @@ func (ws *WSConn) Done() <-chan struct{} {
 func (ws *WSConn) Close() error {
 	var closeErr error
 	ws.closeOnce.Do(func() {
+		ws.cancelCtx()
 		closeErr = ws.conn.Close(websocket.StatusNormalClosure, "")
 	})
 	<-ws.done

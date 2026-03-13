@@ -92,9 +92,10 @@ func TestSubscribeMarketData(t *testing.T) {
 		if _, ok := update.Fields[brokerage.FieldBid]; !ok {
 			t.Error("missing FieldBid")
 		}
-		// FieldVolume ("86") should be filtered out since we didn't request it.
-		// But "86" is FieldAsk actually. Let me verify — FieldAsk = "86".
-		// We only requested FieldLast("31") and FieldBid("84").
+		// Field "86" should be filtered out since we only requested FieldLast and FieldBid.
+		if _, ok := update.Fields[brokerage.SnapshotField("86")]; ok {
+			t.Error("field 86 should have been filtered out")
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for market data")
 	}

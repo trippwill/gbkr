@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -16,7 +17,7 @@ import (
 )
 
 func testLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(nil, nil))
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func TestDialWS_Success(t *testing.T) {
@@ -125,7 +126,7 @@ func TestWSConn_Subscribe(t *testing.T) {
 	defer ws.Close()
 
 	received := make(chan json.RawMessage, 1)
-	cancelSub := ws.Subscribe("ntf", func(data json.RawMessage) {
+	cancelSub, _ := ws.Subscribe("ntf", func(data json.RawMessage) {
 		received <- data
 	})
 	defer cancelSub()
@@ -174,13 +175,13 @@ func TestWSConn_Subscribe_MultipleHandlers(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	cancel1 := ws.Subscribe("ntf", func(_ json.RawMessage) {
+	cancel1, _ := ws.Subscribe("ntf", func(_ json.RawMessage) {
 		count.Add(1)
 		wg.Done()
 	})
 	defer cancel1()
 
-	cancel2 := ws.Subscribe("ntf", func(_ json.RawMessage) {
+	cancel2, _ := ws.Subscribe("ntf", func(_ json.RawMessage) {
 		count.Add(1)
 		wg.Done()
 	})
@@ -229,7 +230,7 @@ func TestWSConn_Subscribe_Cancel(t *testing.T) {
 	defer ws.Close()
 
 	called := atomic.Bool{}
-	cancelSub := ws.Subscribe("ntf", func(_ json.RawMessage) {
+	cancelSub, _ := ws.Subscribe("ntf", func(_ json.RawMessage) {
 		called.Store(true)
 	})
 
@@ -362,7 +363,7 @@ func TestWSConn_UnmatchedTopic(t *testing.T) {
 	defer ws.Close()
 
 	received := make(chan struct{}, 1)
-	cancelSub := ws.Subscribe("ntf", func(_ json.RawMessage) {
+	cancelSub, _ := ws.Subscribe("ntf", func(_ json.RawMessage) {
 		received <- struct{}{}
 	})
 	defer cancelSub()

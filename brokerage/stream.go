@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/transport"
@@ -19,6 +21,9 @@ type MarketDataUpdate struct {
 	ConID  gbkr.ConID
 	Fields map[SnapshotField]json.RawMessage
 }
+
+// sendTimeout is the maximum time allowed for a subscribe/unsubscribe send.
+const sendTimeout = 5 * time.Second
 
 // SubscribeMarketData subscribes to streaming market data for the given
 // contract. Only the requested fields are included in updates (when the
@@ -46,7 +51,14 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 		requested[f] = struct{}{}
 	}
 
-	cancelSub := ws.Subscribe(topic, func(data json.RawMessage) {
+	var (
+		cancelSub func()
+		active    *atomic.Bool
+	)
+	cancelSub, active = ws.Subscribe(topic, func(data json.RawMessage) {
+		if !active.Load() {
+			return
+		}
 		var raw map[string]json.RawMessage
 		if err := json.Unmarshal(data, &raw); err != nil {
 			return
@@ -80,7 +92,14 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 		}
 	})
 
-	_ = ws.Send(context.Background(), subCmd)
+	sendCtx, sendCancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer sendCancel()
+	if err := ws.Send(sendCtx, subCmd); err != nil {
+		active.Store(false)
+		cancelSub()
+		close(ch)
+		return nil, nil, fmt.Errorf("subscribe %s: %w", topic, err)
+	}
 	s.EmitOp(gbkr.OpStreamSubscribe,
 		slog.String("topic", topic),
 		slog.Int("conid", int(conID)))
@@ -88,9 +107,12 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 	var cancelOnce sync.Once
 	cancelFn := func() {
 		cancelOnce.Do(func() {
+			active.Store(false)
 			cancelSub()
 			unsub := fmt.Sprintf("umd+%d+{}", conID)
-			_ = ws.Send(context.Background(), unsub)
+			unsubCtx, unsubCancel := context.WithTimeout(context.Background(), sendTimeout)
+			defer unsubCancel()
+			_ = ws.Send(unsubCtx, unsub)
 			s.EmitOp(gbkr.OpStreamUnsubscribe,
 				slog.String("topic", topic),
 				slog.Int("conid", int(conID)))
@@ -166,9 +188,16 @@ func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int
 	ws := s.WsConn()
 	ch := make(chan T, bufSize)
 
-	cancelSub := ws.Subscribe(topic, func(data json.RawMessage) {
+	var (
+		cancelSub func()
+		active    *atomic.Bool
+	)
+	cancelSub, active = ws.Subscribe(topic, func(data json.RawMessage) {
 		v, err := parse(data)
 		if err != nil {
+			return
+		}
+		if !active.Load() {
 			return
 		}
 		if dropOnFull {
@@ -186,16 +215,26 @@ func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int
 		}
 	})
 
-	_ = ws.Send(context.Background(), subCmd)
+	sendCtx, sendCancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer sendCancel()
+	if err := ws.Send(sendCtx, subCmd); err != nil {
+		active.Store(false)
+		cancelSub()
+		close(ch)
+		return nil, nil, fmt.Errorf("subscribe %s: %w", topic, err)
+	}
 	s.EmitOp(gbkr.OpStreamSubscribe, slog.String("topic", topic))
 
 	var cancelOnce sync.Once
 	cancelFn := func() {
 		cancelOnce.Do(func() {
+			active.Store(false)
 			cancelSub()
 			if len(topic) > 1 {
 				unsub := "u" + topic[1:]
-				_ = ws.Send(context.Background(), unsub)
+				unsubCtx, unsubCancel := context.WithTimeout(context.Background(), sendTimeout)
+				defer unsubCancel()
+				_ = ws.Send(unsubCtx, unsub)
 			}
 			s.EmitOp(gbkr.OpStreamUnsubscribe, slog.String("topic", topic))
 			close(ch)
