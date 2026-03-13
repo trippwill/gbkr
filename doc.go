@@ -14,6 +14,32 @@
 //     SecurityDefinitions, and Trades.
 //     See the [github.com/trippwill/gbkr/brokerage] package for details.
 //
+// # WebSocket Streaming
+//
+// Real-time push updates are available via [Client.Stream], which opens a
+// single WebSocket connection to the gateway. Subscriptions return typed
+// Go channels and a cancel function:
+//
+//	stream, err := client.Stream(ctx)
+//	pnl, cancel, err := stream.PortfolioPnL(accountID)
+//	defer cancel()
+//	for update := range pnl {
+//	    fmt.Println(update.DailyPnL)
+//	}
+//
+// Gateway-level topics (no brokerage session required):
+//   - [Stream.Notifications] — bulletin/alert messages (topic: ntf)
+//   - [Stream.AccountSummary] — account balance updates (topic: sbd+{acctId})
+//   - [Stream.PortfolioPnL] — portfolio P&L updates (topic: spl+{acctId})
+//
+// Brokerage-level topics (require [brokerage.NewSession]):
+//   - [brokerage.SubscribeMarketData] — streaming market data ticks (topic: smd+{conid})
+//   - [brokerage.SubscribeOrders] — order status updates (topic: sor)
+//   - [brokerage.SubscribeTrades] — trade execution updates (topic: str)
+//
+// The stream sends keepalive messages automatically. It does not auto-reconnect;
+// consumers observe channel closure on disconnect and may re-dial as needed.
+//
 // # Capability-to-Path Mapping
 //
 //	Capability                 Access Point                          IBKR Path Prefix
@@ -44,6 +70,8 @@
 // with a custom [PacingPolicy] via [WithRateLimit]. An optional
 // [PacingObserver] (set via [WithPacingObserver]) receives notifications
 // about pacing waits and cache events.
+//
+// WebSocket streaming does not consume the REST pacing budget.
 //
 // # Data Freshness
 //
