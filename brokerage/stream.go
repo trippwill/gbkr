@@ -142,7 +142,7 @@ type OrderUpdate struct {
 // SubscribeOrders subscribes to live order status updates.
 // Topic: sor. Uses blocking channel semantics (loss-intolerant).
 func SubscribeOrders(s *gbkr.Stream) (updates <-chan OrderUpdate, cancel func(), err error) {
-	return brokerageSubscribe(s, "sor", "sor+{}", 32, false,
+	return brokerageSubscribe(s, "sor", "sor+{}", 32,
 		func(data json.RawMessage) (OrderUpdate, error) {
 			var u OrderUpdate
 			if err := json.Unmarshal(data, &u); err != nil {
@@ -168,7 +168,7 @@ type TradeUpdate struct {
 // SubscribeTrades subscribes to live trade execution updates.
 // Topic: str. Uses blocking channel semantics (loss-intolerant).
 func SubscribeTrades(s *gbkr.Stream) (updates <-chan TradeUpdate, cancel func(), err error) {
-	return brokerageSubscribe(s, "str", "str+{}", 32, false,
+	return brokerageSubscribe(s, "str", "str+{}", 32,
 		func(data json.RawMessage) (TradeUpdate, error) {
 			var u TradeUpdate
 			if err := json.Unmarshal(data, &u); err != nil {
@@ -180,7 +180,8 @@ func SubscribeTrades(s *gbkr.Stream) (updates <-chan TradeUpdate, cancel func(),
 }
 
 // brokerageSubscribe is a helper for brokerage-level topic subscriptions.
-func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int, dropOnFull bool, parse func(json.RawMessage) (T, error)) (<-chan T, func(), error) {
+// Uses blocking channel semantics (loss-intolerant).
+func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int, parse func(json.RawMessage) (T, error)) (<-chan T, func(), error) {
 	if s.IsClosed() {
 		return nil, nil, gbkr.ErrStreamNotConnected
 	}
@@ -200,19 +201,7 @@ func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int
 		if !active.Load() {
 			return
 		}
-		if dropOnFull {
-			select {
-			case ch <- v:
-			default:
-				select {
-				case <-ch:
-				default:
-				}
-				ch <- v
-			}
-		} else {
-			ch <- v
-		}
+		ch <- v
 	})
 
 	sendCtx, sendCancel := context.WithTimeout(context.Background(), sendTimeout)
