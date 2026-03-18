@@ -93,6 +93,41 @@ func TestAccount_Summary(t *testing.T) {
 	}
 }
 
+func TestAccountList_UnmarshalJSON_Error(t *testing.T) {
+	var al AccountList
+	if err := json.Unmarshal([]byte(`"not_an_object"`), &al); err == nil {
+		t.Fatal("expected unmarshal error for invalid JSON")
+	}
+}
+
+func TestAccountSummary_UnmarshalJSON_Error(t *testing.T) {
+	var as AccountSummary
+	if err := json.Unmarshal([]byte(`"not_an_object"`), &as); err == nil {
+		t.Fatal("expected unmarshal error for invalid JSON")
+	}
+}
+
+func TestSummaryField_UnmarshalJSON_Error(t *testing.T) {
+	var sf SummaryField
+	if err := json.Unmarshal([]byte(`"not_an_object"`), &sf); err == nil {
+		t.Fatal("expected unmarshal error for invalid JSON")
+	}
+}
+
+func TestPnLEntry_UnmarshalJSON_Error(t *testing.T) {
+	var e PnLEntry
+	if err := json.Unmarshal([]byte(`"not_an_object"`), &e); err == nil {
+		t.Fatal("expected unmarshal error for invalid JSON")
+	}
+}
+
+func TestPnLPartitioned_UnmarshalJSON_Error(t *testing.T) {
+	var p PnLPartitioned
+	if err := json.Unmarshal([]byte(`"not_an_object"`), &p); err == nil {
+		t.Fatal("expected unmarshal error for invalid JSON")
+	}
+}
+
 func TestAccountList_UnmarshalJSON(t *testing.T) {
 	data := []byte(`{
 		"accounts": ["U1234567", "U7654321"],
@@ -186,5 +221,41 @@ func TestPnLEntry_UnmarshalJSON(t *testing.T) {
 	}
 	if e.MarginValue != 75000 {
 		t.Errorf("MarginValue = %f", e.MarginValue)
+	}
+}
+
+func TestAccounts_List_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.Accounts().List(context.Background())
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}
+
+func TestAccounts_PnL_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.Accounts().PnL(context.Background())
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}
+
+func TestAccount_Summary_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.Account("U1234567").Summary(context.Background())
+	if err == nil {
+		t.Fatal("expected error for 500")
 	}
 }

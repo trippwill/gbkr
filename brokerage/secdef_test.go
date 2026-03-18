@@ -33,3 +33,15 @@ func TestSecurityDefinitions_Search(t *testing.T) {
 		t.Errorf("Symbol = %q", results[0].Symbol)
 	}
 }
+
+func TestSecurityDefinitions_Search_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.SecurityDefinitions().Search(context.Background(), "AAPL")
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}

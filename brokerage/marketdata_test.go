@@ -379,3 +379,69 @@ func TestHistoryResponse_Empty(t *testing.T) {
 		t.Errorf("Bars = %d, want 0", len(hr.Bars))
 	}
 }
+
+func TestFieldValue_InvalidTypes(t *testing.T) {
+	// Int64: non-numeric JSON triggers fallback to zero.
+	intFV := FieldValue{raw: json.RawMessage(`"not_a_number"`)}
+	if intFV.Int64() != 0 {
+		t.Errorf("Int64() = %d, want 0 for non-numeric string", intFV.Int64())
+	}
+
+	// Bool: non-boolean JSON triggers fallback to false.
+	boolFV := FieldValue{raw: json.RawMessage(`"yes"`)}
+	if boolFV.Bool() {
+		t.Error("Bool() should be false for non-boolean string")
+	}
+
+	// Float64: string that can't be parsed as float triggers fallback to zero.
+	floatFV := FieldValue{raw: json.RawMessage(`"not_a_float"`)}
+	if floatFV.Float64() != 0 {
+		t.Errorf("Float64() = %f, want 0 for unparseable string", floatFV.Float64())
+	}
+
+	// Float64: non-string, non-number JSON (e.g. array) triggers fallback to zero.
+	arrayFV := FieldValue{raw: json.RawMessage(`[1,2,3]`)}
+	if arrayFV.Float64() != 0 {
+		t.Errorf("Float64() = %f, want 0 for array value", arrayFV.Float64())
+	}
+}
+
+func TestSnapshot_hasAll_NilFields(t *testing.T) {
+	// A zero-value snapshot has nil fields.
+	var s Snapshot
+	if s.hasAll([]SnapshotField{FieldLast}) {
+		t.Error("hasAll should return false for nil fields with non-empty check list")
+	}
+	if !s.hasAll(nil) {
+		t.Error("hasAll should return true for nil fields with empty check list")
+	}
+}
+
+func TestMarketData_Snapshot_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.MarketData().Snapshot(context.Background(), SnapshotParams{
+		ConIDs: []gbkr.ConID{265598},
+		Fields: []SnapshotField{FieldLast},
+	})
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}
+
+func TestMarketData_History_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.MarketData().History(context.Background(), HistoryParams{
+		ConID: 265598,
+	})
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}

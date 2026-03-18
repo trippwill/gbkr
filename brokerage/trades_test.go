@@ -99,3 +99,15 @@ func TestTradeExecution_Partial(t *testing.T) {
 		t.Errorf("ConID = %d, want 0", te.ConID)
 	}
 }
+
+func TestTrades_Recent_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.Trades().Recent(context.Background(), 7)
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}

@@ -142,3 +142,15 @@ func TestContractSearchResult_Partial(t *testing.T) {
 		t.Errorf("Symbol = %q, want empty", r.Symbol)
 	}
 }
+
+func TestContracts_Info_Error(t *testing.T) {
+	bc, srv := newTestBrokerageClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	_, err := bc.Contracts().Info(context.Background(), 265598)
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}
