@@ -72,7 +72,7 @@ depends = ["fmt-check", "vet", "build-ci"]
 depends_post = ["coverage-ci"]
 
 [tasks.precommit]
-depends = ["fmt", "build"]
+depends = ["fmt", "build", "flex:precommit"]
 depends_post = ["test-race"]
 
 [tasks."flex:tidy"]
