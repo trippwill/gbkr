@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="MidwatchActivityQuery" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1234567" fromDate="2026-01-01" toDate="2026-03-20" period="YearToDate" whenGenerated="2026-03-20;19:30:00">
+      <Trades>
+        <Trade transactionID="TXN001" tradeID="T001" ibOrderID="ORD001" ibExecID="EXEC001" accountId="U1234567" conid="265598" symbol="AAPL" underlyingSymbol="" underlyingConid="0" assetCategory="STK" buySell="BUY" quantity="100" tradePrice="175.50" tradeMoney="17550.00" proceeds="-17550.00" ibCommission="-1.00" taxes="0" netCash="-17551.00" fifoPnlRealized="0" costBasis="17551.00" strike="" expiry="" putCall="" openCloseIndicator="O" orderReference="" tradeDate="2026-01-15" settleDate="2026-01-17" currency="USD" multiplier="1" />
+        <Trade transactionID="TXN002" tradeID="T002" ibOrderID="ORD002" ibExecID="EXEC002" accountId="U1234567" conid="610640834" symbol="AAPL  260321C00180000" underlyingSymbol="AAPL" underlyingConid="265598" assetCategory="OPT" buySell="SELL" quantity="-1" tradePrice="3.20" tradeMoney="-320.00" proceeds="320.00" ibCommission="-0.65" taxes="0" netCash="319.35" fifoPnlRealized="0" costBasis="-320.65" strike="180" expiry="2026-03-21" putCall="C" openCloseIndicator="O" orderReference="" tradeDate="2026-02-10" settleDate="2026-02-11" currency="USD" multiplier="100" />
+        <Trade transactionID="TXN003" tradeID="T003" ibOrderID="ORD003" ibExecID="EXEC003" accountId="U1234567" conid="610640834" symbol="AAPL  260321C00180000" underlyingSymbol="AAPL" underlyingConid="265598" assetCategory="OPT" buySell="BUY" quantity="1" tradePrice="0.50" tradeMoney="50.00" proceeds="-50.00" ibCommission="-0.65" taxes="0" netCash="-50.65" fifoPnlRealized="269.70" costBasis="0" strike="180" expiry="2026-03-21" putCall="C" openCloseIndicator="C" orderReference="" tradeDate="2026-03-10" settleDate="2026-03-11" currency="USD" multiplier="100" />
+      </Trades>
+      <CashTransactions>
+        <CashTransaction transactionID="CTX001" accountId="U1234567" conid="265598" symbol="AAPL" type="Dividends" amount="25.00" currency="USD" description="AAPL(US0378331005) Cash Dividend 0.25 per Share (Ordinary Dividend)" reportDate="2026-02-08" settleDate="2026-02-08" />
+        <CashTransaction transactionID="CTX002" accountId="U1234567" conid="0" symbol="" type="Broker Interest Paid" amount="-12.50" currency="USD" description="USD Debit Interest for 01/2026" reportDate="2026-02-03" settleDate="2026-02-03" />
+        <CashTransaction transactionID="CTX003" accountId="U1234567" conid="265598" symbol="AAPL" type="Withholding Tax" amount="-3.75" currency="USD" description="AAPL(US0378331005) Cash Dividend 0.25 per Share - US Tax" reportDate="2026-02-08" settleDate="2026-02-08" />
+      </CashTransactions>
+      <OptionEAE>
+        <OptionEAE transactionType="Assignment" accountId="U1234567" conid="610640834" symbol="AAPL  260321C00180000" underlyingSymbol="AAPL" underlyingConid="265598" strike="180" expiry="2026-03-21" putCall="C" quantity="-1" proceeds="18000.00" realizedPnl="0" tradeDate="2026-03-21" currency="USD" multiplier="100" />
+      </OptionEAE>
+      <CommissionDetails>
+        <CommissionDetail accountId="U1234567" conid="265598" symbol="AAPL" tradeID="T001" execID="EXEC001" brokerExecutionCharge="0.50" brokerClearingCharge="0.20" thirdPartyExecutionCharge="0.10" regFINRATradingActivityFee="0.0119" regSection31TransactionFee="0.0046" currency="USD" tradeDate="2026-01-15" />
+      </CommissionDetails>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexStatementResponse>
+  <Status>Success</Status>
+  <ReferenceCode>1234567890</ReferenceCode>
+  <Url>https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetStatement?q=1234567890&amp;t=TOKEN&amp;v=3</Url>
+</FlexStatementResponse>

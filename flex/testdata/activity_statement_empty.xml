@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="EmptyQuery" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1234567" fromDate="2026-03-20" toDate="2026-03-20" period="LastBusinessDay" whenGenerated="2026-03-20;19:30:00">
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>
