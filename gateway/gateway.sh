@@ -26,6 +26,8 @@ Commands:
   stop    Stop and remove the gateway container
   logs    Follow container logs
   status  Show container status
+  alive   Check if the container is running (exit 0/1)
+  start   Build image if needed, then run container (idempotent)
 
 Container runtime: ${RUNTIME}
 Override with CONTAINER_RUNTIME=docker|podman
@@ -40,6 +42,14 @@ container_exists() {
     podman container exists "$1" 2>/dev/null
   else
     docker container inspect "$1" &>/dev/null
+  fi
+}
+
+image_exists() {
+  if [ "${RUNTIME}" = "podman" ]; then
+    podman image exists "$1" 2>/dev/null
+  else
+    docker image inspect "$1" &>/dev/null
   fi
 }
 
@@ -89,12 +99,33 @@ cmd_status() {
   fi
 }
 
+cmd_alive() {
+  if container_exists "${CONTAINER_NAME}"; then
+    exit 0
+  else
+    exit 1
+  fi
+}
+
+cmd_start() {
+  if container_exists "${CONTAINER_NAME}"; then
+    exit 0
+  fi
+  if ! image_exists "${IMAGE_NAME}"; then
+    cmd_build
+  fi
+  cmd_run
+}
+
 case "${1:-}" in
 build) cmd_build ;;
 run) cmd_run ;;
 stop) cmd_stop ;;
 logs) cmd_logs ;;
 status) cmd_status ;;
+# Exec contract commands (used by midwatch exec adapter)
+alive) cmd_alive ;;
+start) cmd_start ;;
 *)
   usage
   exit 1
