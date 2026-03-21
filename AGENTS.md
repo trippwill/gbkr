@@ -11,6 +11,8 @@ Prefer `mise` tasks over raw Go commands for consistent environment and task cha
 - `mise run vet`: golangci-lint
 - `mise run test`: run all tests without cache
 - `mise run test-race`: tests with race detector
+- `mise run flex:ci`: run the `flex/` CI pipeline from the repo root
+- `mise run flex:precommit`: run the `flex/` precommit pipeline from the repo root
 
 ### Linting with golangci-lint
 Linting uses `golangci-lint` v2 (managed by mise):
@@ -43,6 +45,12 @@ Also defines: functional options (`WithBaseURL`, `WithHTTPClient`, `WithInsecure
 `Transport` struct holds base URL, HTTP client, logger, and request hook. Provides `Get`, `Post`, and `EmitOp` methods. Defines `APIError` and `ErrAPIRequest` (re-exported by the root package). Invisible to external consumers.
 
 **`internal/jx/`** — `Deref[T]` generic helper for safe pointer dereference in JSON unmarshaling.
+
+**`flex/`** — Flex Web Service client. Separate Go module at `github.com/trippwill/gbkr/flex`.
+Provides `Client` for retrieving Activity Statement XML reports from IBKR's cloud Flex endpoint
+(independent of the Client Portal Gateway). Key types: `Client`, `QueryResponse`, `Statement`,
+`Trade`, `CashTransaction`, `OptionEvent`. Has its own `.mise/config.toml` and `.golangci.yml`;
+run `mise run ci` from the `flex/` directory, or `mise run flex:ci` from the repo root.
 
 **`cmd/gbkr/`** — CLI test harness demonstrating two-tier session model.
 

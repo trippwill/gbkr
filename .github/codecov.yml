@@ -29,6 +29,10 @@ component_management:
       name: gbkr
       paths:
         - "*.go"
+    - component_id: flex
+      name: flex
+      paths:
+        - "flex/**"
     - component_id: brokerage
       name: brokerage
       paths:
