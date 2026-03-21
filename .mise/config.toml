@@ -74,3 +74,58 @@ depends_post = ["coverage-ci"]
 [tasks.precommit]
 depends = ["fmt", "build"]
 depends_post = ["test-race"]
+
+[tasks."flex:tidy"]
+description = "Run flex tidy from the repo root"
+dir = "flex"
+run = "mise run tidy"
+
+[tasks."flex:fmt"]
+description = "Run flex fmt from the repo root"
+dir = "flex"
+run = "mise run fmt"
+
+[tasks."flex:fmt-check"]
+description = "Run flex fmt-check from the repo root"
+dir = "flex"
+run = "mise run fmt-check"
+
+[tasks."flex:vet"]
+description = "Run flex vet from the repo root"
+dir = "flex"
+run = "mise run vet"
+
+[tasks."flex:build"]
+description = "Run flex build from the repo root"
+dir = "flex"
+run = "mise run build"
+
+[tasks."flex:test"]
+description = "Run flex test from the repo root"
+dir = "flex"
+run = "mise run test"
+
+[tasks."flex:test-race"]
+description = "Run flex test-race from the repo root"
+dir = "flex"
+run = "mise run test-race"
+
+[tasks."flex:coverage"]
+description = "Run flex coverage from the repo root"
+dir = "flex"
+run = "mise run coverage"
+
+[tasks."flex:coverage-ci"]
+description = "Run flex coverage-ci from the repo root"
+dir = "flex"
+run = "mise run coverage-ci"
+
+[tasks."flex:ci"]
+description = "Run flex CI from the repo root"
+dir = "flex"
+run = "mise run ci"
+
+[tasks."flex:precommit"]
+description = "Run flex precommit from the repo root"
+dir = "flex"
+run = "mise run precommit"

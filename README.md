@@ -254,6 +254,8 @@ if errors.Is(err, flex.ErrTokenExpired) {
 mise run precommit   # fmt → build → test with race detection
 mise run ci          # full CI pipeline
 mise run vet         # golangci-lint
+mise run flex:precommit  # run the flex module precommit pipeline from repo root
+mise run flex:ci         # run the flex module CI pipeline from repo root
 ```
 
 See [AGENTS.md](AGENTS.md) for full development guidelines.
