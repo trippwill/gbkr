@@ -30,6 +30,10 @@ const (
 
 	// ErrServiceUnavailable indicates the Flex Web Service is temporarily unavailable.
 	ErrServiceUnavailable = Error("flex service unavailable")
+
+	// ErrWrongFormat indicates the Flex query is not configured for XML output.
+	// To fix: edit the query in IBKR Client Portal → Flex Queries and set Format to XML.
+	ErrWrongFormat = Error("flex query is returning CSV; change Format to XML in the IBKR Flex query template")
 )
 
 // ResponseError wraps an error code and message from a FlexStatementResponse.
