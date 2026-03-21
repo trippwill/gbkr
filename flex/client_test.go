@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -74,6 +75,25 @@ func TestSendRequest_TokenExpired(t *testing.T) {
 	}
 }
 
+func TestSendRequest_HTTPStatusError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "gateway offline", http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err := c.SendRequest(context.Background(), "TOKEN", "QUERYID")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "unexpected HTTP 502 Bad Gateway") {
+		t.Fatalf("error = %v, want HTTP status context", err)
+	}
+	if !strings.Contains(err.Error(), "gateway offline") {
+		t.Fatalf("error = %v, want body preview", err)
+	}
+}
+
 func TestGetStatement_Success(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
 	if err != nil {
@@ -98,6 +118,87 @@ func TestGetStatement_Success(t *testing.T) {
 	}
 	if resp.Statements[0].AccountID != "U1234567" {
 		t.Errorf("AccountID = %q, want %q", resp.Statements[0].AccountID, "U1234567")
+	}
+}
+
+func TestGetStatement_HTTPStatusError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err := c.GetStatement(context.Background(), "TOKEN", "REF123")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "unexpected HTTP 503 Service Unavailable") {
+		t.Fatalf("error = %v, want HTTP status context", err)
+	}
+	if !strings.Contains(err.Error(), "service unavailable") {
+		t.Fatalf("error = %v, want body preview", err)
+	}
+}
+
+func TestGetStatement_ResponseTooLarge(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		if _, err := w.Write([]byte(strings.Repeat("x", 33))); err != nil {
+			t.Fatalf("write response: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(
+		WithBaseURL(srv.URL+"/"),
+		WithMaxResponseBytes(32),
+	)
+	_, err := c.GetStatement(context.Background(), "TOKEN", "REF123")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "exceeds configured limit of 32 bytes") {
+		t.Fatalf("error = %v, want response size limit error", err)
+	}
+}
+
+func TestGetStatement_WrongFormatSavesCSV(t *testing.T) {
+	body := []byte("\"Date\",\"Symbol\"\n\"2026-03-21\",\"SPY\"\n")
+	dir := t.TempDir()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/csv")
+		if _, err := w.Write(body); err != nil {
+			t.Fatalf("write response: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(
+		WithBaseURL(srv.URL+"/"),
+		WithReportDir(dir),
+	)
+	_, err := c.GetStatement(context.Background(), "TOKEN", "../unsafe/ref")
+	if !errors.Is(err, ErrWrongFormat) {
+		t.Fatalf("GetStatement error = %v, want ErrWrongFormat", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("saved file count = %d, want 1", len(entries))
+	}
+	name := entries[0].Name()
+	if strings.Contains(name, "/") || strings.Contains(name, "..") {
+		t.Fatalf("saved filename %q is not sanitized", name)
+	}
+	if !strings.Contains(name, "unsafe_ref") {
+		t.Fatalf("saved filename %q does not contain sanitized refcode", name)
+	}
+	if !strings.HasSuffix(name, "-csv.csv") {
+		t.Fatalf("saved filename %q does not use CSV suffix/extension", name)
 	}
 }
 
@@ -211,6 +312,39 @@ func TestFetchReport_ContextCanceled(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("expected error from context cancellation")
+	}
+}
+
+func TestSaveReport_UsesUniqueSafeNames(t *testing.T) {
+	dir := t.TempDir()
+	c := NewClient(WithReportDir(dir))
+
+	c.saveReport(context.Background(), "../unsafe/ref", []byte("<xml/>"), "", ".xml")
+	c.saveReport(context.Background(), "../unsafe/ref", []byte("<xml/>"), "", ".xml")
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("saved file count = %d, want 2", len(entries))
+	}
+	seen := map[string]struct{}{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if _, ok := seen[name]; ok {
+			t.Fatalf("duplicate saved filename %q", name)
+		}
+		seen[name] = struct{}{}
+		if strings.Contains(name, "/") || strings.Contains(name, "..") {
+			t.Fatalf("saved filename %q is not sanitized", name)
+		}
+		if !strings.Contains(name, "unsafe_ref") {
+			t.Fatalf("saved filename %q does not contain sanitized refcode", name)
+		}
+		if !strings.HasSuffix(name, ".xml") {
+			t.Fatalf("saved filename %q does not use XML extension", name)
+		}
 	}
 }
 

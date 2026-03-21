@@ -217,7 +217,7 @@ import (
 
 func main() {
     c := flex.NewClient(
-        flex.WithReportDir("/tmp/flex-reports"), // optional: save raw XML
+        flex.WithReportDir("/tmp/flex-reports"), // optional: save raw XML/CSV responses
     )
 
     resp, err := c.FetchReport(context.Background(), "YOUR_TOKEN", "YOUR_QUERY_ID",
