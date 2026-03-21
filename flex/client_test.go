@@ -214,6 +214,130 @@ func TestFetchReport_ContextCanceled(t *testing.T) {
 	}
 }
 
+func TestGetStatement_WithReportDir_WritesXMLFile(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeXML(t, w, data)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	c := NewClient(WithBaseURL(srv.URL+"/"), WithReportDir(dir))
+	_, err = c.GetStatement(context.Background(), "TOKEN", "REF999")
+	if err != nil {
+		t.Fatalf("GetStatement: %v", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("file count = %d, want 1", len(entries))
+	}
+	name := entries[0].Name()
+	if !contains(name, "REF999") {
+		t.Errorf("filename %q does not contain ref code", name)
+	}
+	if !hasSuffix(name, ".xml") {
+		t.Errorf("filename %q does not end with .xml", name)
+	}
+	// Success files must not have an -err or -csv infix.
+	if contains(name, "-err") || contains(name, "-csv") {
+		t.Errorf("success file should have no error suffix, got %q", name)
+	}
+}
+
+func TestGetStatement_CSVResponse_WritesCsvSuffixedFile(t *testing.T) {
+	// IBKR returns a CSV body when the query Format is not set to XML.
+	// The body starts with '"' and contains no '<'.
+	csvBody := []byte(`"Status","DataSet","ErrorCode","ErrorMessage"` + "\r\n" + `"Success","","",""` + "\r\n")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		if _, err := w.Write(csvBody); err != nil {
+			t.Fatalf("write response: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	c := NewClient(WithBaseURL(srv.URL+"/"), WithReportDir(dir))
+	_, err := c.GetStatement(context.Background(), "TOKEN", "CSVREF")
+	if !errors.Is(err, ErrWrongFormat) {
+		t.Fatalf("error = %v, want ErrWrongFormat", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("file count = %d, want 1", len(entries))
+	}
+	name := entries[0].Name()
+	if !contains(name, "-csv") {
+		t.Errorf("filename %q should contain -csv suffix, got %q", name, name)
+	}
+}
+
+func TestGetStatement_ErrorResponse_WritesErrSuffixedFile(t *testing.T) {
+	// IBKR returns a status/error XML response when the query fails
+	// (e.g. expired token, query not found). This parses as a FlexError.
+	errBody := []byte(`<?xml version="1.0" encoding="UTF-8"?>` +
+		`<FlexStatementResponse><Status>Fail</Status>` +
+		`<ErrorCode>1012</ErrorCode>` +
+		`<ErrorMessage>Account not found or not permitted.</ErrorMessage>` +
+		`</FlexStatementResponse>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeXML(t, w, errBody)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	c := NewClient(WithBaseURL(srv.URL+"/"), WithReportDir(dir))
+	_, err := c.GetStatement(context.Background(), "TOKEN", "ERRREF")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("file count = %d, want 1", len(entries))
+	}
+	name := entries[0].Name()
+	if !contains(name, "-err") {
+		t.Errorf("filename %q should contain -err suffix", name)
+	}
+}
+
+// contains reports whether substr appears in s.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr))
+}
+
+func containsAt(s, substr string) bool {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSuffix reports whether s ends with suffix.
+func hasSuffix(s, suffix string) bool {
+	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+}
+
 func TestIsRetryable(t *testing.T) {
 	tests := []struct {
 		name string

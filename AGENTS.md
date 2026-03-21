@@ -44,6 +44,12 @@ Also defines: functional options (`WithBaseURL`, `WithHTTPClient`, `WithInsecure
 
 **`internal/jx/`** — `Deref[T]` generic helper for safe pointer dereference in JSON unmarshaling.
 
+**`flex/`** — Flex Web Service client. Separate Go module at `github.com/trippwill/gbkr/flex`.
+Provides `Client` for retrieving Activity Statement XML reports from IBKR's cloud Flex endpoint
+(independent of the Client Portal Gateway). Key types: `Client`, `QueryResponse`, `Statement`,
+`Trade`, `CashTransaction`, `OptionEvent`. Has its own `.mise/config.toml` and `.golangci.yml`;
+run `mise run ci` from the `flex/` directory.
+
 **`cmd/gbkr/`** — CLI test harness demonstrating two-tier session model.
 
 **`gateway/`** — Container config for running the IBKR Client Portal Gateway locally (Containerfile, conf.yaml, helper scripts). Not a Go package.

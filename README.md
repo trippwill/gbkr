@@ -184,9 +184,71 @@ uses the original API keys so wire compatibility is preserved.
 |----------|---------|-------------|
 | `HardwareInfo` | `hardware_info` | Hardware info string |
 
-## Development
+## Flex Web Service (`gbkr/flex`)
 
-This project uses [mise](https://mise.jdx.dev/) for task automation:
+The `flex` subpackage is a separate Go module for retrieving IBKR Activity Statement reports
+via the Flex Web Service — a standalone IBKR API independent of the Client Portal Gateway.
+
+```bash
+go get github.com/trippwill/gbkr/flex
+```
+
+### What it does
+
+- Fetches Activity Statement XML reports using a long-lived API token and pre-configured query ID
+- Parses Trades, Cash Transactions, Option Events, and Commission Details sections
+- Handles the two-step retrieval protocol (SendRequest → poll GetStatement) with configurable retry/backoff
+- Optionally saves raw response bodies to disk for debugging
+- Detects common misconfigurations (CSV output, expired tokens, query errors)
+
+### Quick Start
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/trippwill/gbkr/flex"
+)
+
+func main() {
+    c := flex.NewClient(
+        flex.WithReportDir("/tmp/flex-reports"), // optional: save raw XML
+    )
+
+    resp, err := c.FetchReport(context.Background(), "YOUR_TOKEN", "YOUR_QUERY_ID",
+        flex.WithMaxRetries(10),
+        flex.WithInitialDelay(5*time.Second),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, stmt := range resp.Statements {
+        fmt.Printf("Account %s: %d trades\n", stmt.AccountID, len(stmt.Trades))
+    }
+}
+```
+
+### Error Types
+
+```go
+import "errors"
+
+// Check for specific conditions
+if errors.Is(err, flex.ErrWrongFormat) {
+    // Query Format is not set to XML in IBKR Flex query template
+}
+if errors.Is(err, flex.ErrTokenExpired) {
+    // API token needs to be renewed in IBKR Client Portal
+}
+```
+
+## Development
 
 ```bash
 mise run precommit   # fmt → build → test with race detection
