@@ -50,8 +50,15 @@ func (nn *NullNum) UnmarshalText(data []byte) error {
 		nn.Num = Num{}
 		return nil
 	}
+	var parsed Num
+	if err := parsed.UnmarshalText(data); err != nil {
+		nn.Valid = false
+		nn.Num = Num{}
+		return err
+	}
 	nn.Valid = true
-	return nn.Num.UnmarshalText(data)
+	nn.Num = parsed
+	return nil
 }
 
 // Value implements [database/sql/driver.Valuer]. Returns nil when !Valid.
@@ -69,6 +76,13 @@ func (nn *NullNum) Scan(src any) error {
 		nn.Num = Num{}
 		return nil
 	}
+	var scanned Num
+	if err := scanned.Scan(src); err != nil {
+		nn.Valid = false
+		nn.Num = Num{}
+		return err
+	}
 	nn.Valid = true
-	return nn.Num.Scan(src)
+	nn.Num = scanned
+	return nil
 }

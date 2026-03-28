@@ -467,6 +467,16 @@ func TestUnmarshalJSON_Null(t *testing.T) {
 	}
 }
 
+func TestOk_ZeroValueIsNotOk(t *testing.T) {
+	var n Num
+	if n.Ok() {
+		t.Fatal("zero-value Num should not be ok")
+	}
+	if n.IsZero() {
+		t.Fatal("zero-value Num should not report zero")
+	}
+}
+
 // --- Text Serialization ---
 
 func TestTextRoundtrip(t *testing.T) {
@@ -481,6 +491,19 @@ func TestTextRoundtrip(t *testing.T) {
 	}
 	if !original.Equal(restored) {
 		t.Errorf("text roundtrip: got %s, want %s", restored.dec.String(), original.dec.String())
+	}
+}
+
+func TestUnmarshalText_FailurePoisonedState(t *testing.T) {
+	n := FromString("123.45")
+	if err := n.UnmarshalText([]byte("not-a-number")); err == nil {
+		t.Fatal("expected error from invalid text")
+	}
+	if n.Ok() {
+		t.Fatal("Num should not be ok after failed UnmarshalText")
+	}
+	if n.dec != (decimal.Decimal{}) {
+		t.Fatal("Num should clear decimal state after failed UnmarshalText")
 	}
 }
 
@@ -514,6 +537,25 @@ func TestScan_Nil(t *testing.T) {
 	var n Num
 	if err := n.Scan(nil); err == nil {
 		t.Error("Scan(nil) should return error for non-nullable Num")
+	}
+	if n.Ok() {
+		t.Fatal("Num should not be ok after Scan(nil)")
+	}
+	if !errors.Is(n.Err, ErrUnsupportedType) {
+		t.Fatalf("expected ErrUnsupportedType, got %v", n.Err)
+	}
+}
+
+func TestScan_FailurePoisonedState(t *testing.T) {
+	n := FromString("123.45")
+	if err := n.Scan(struct{}{}); err == nil {
+		t.Fatal("expected error from unsupported scan type")
+	}
+	if n.Ok() {
+		t.Fatal("Num should not be ok after failed Scan")
+	}
+	if n.dec != (decimal.Decimal{}) {
+		t.Fatal("Num should clear decimal state after failed Scan")
 	}
 }
 

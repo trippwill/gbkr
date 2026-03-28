@@ -114,6 +114,19 @@ func TestNullNumText_Valid(t *testing.T) {
 	}
 }
 
+func TestNullNumUnmarshalText_FailureKeepsInvalid(t *testing.T) {
+	nn := NullNum{Num: FromString("99.99"), Valid: true}
+	if err := nn.UnmarshalText([]byte("not-a-number")); err == nil {
+		t.Fatal("expected error from invalid text")
+	}
+	if nn.Valid {
+		t.Fatal("NullNum should be invalid after failed UnmarshalText")
+	}
+	if nn.Num.Ok() {
+		t.Fatal("NullNum.Num should not be ok after failed UnmarshalText")
+	}
+}
+
 func TestNullNumScan_Nil(t *testing.T) {
 	var nn NullNum
 	if err := nn.Scan(nil); err != nil {
@@ -139,6 +152,19 @@ func TestNullNumScan_Valid(t *testing.T) {
 	if !nn.Num.Equal(expected) {
 		t.Errorf("Scan(42.5) = %s, want %s",
 			nn.Num.dec.String(), expected.dec.String())
+	}
+}
+
+func TestNullNumScan_FailureKeepsInvalid(t *testing.T) {
+	nn := NullNum{Num: FromString("99.99"), Valid: true}
+	if err := nn.Scan(struct{}{}); err == nil {
+		t.Fatal("expected error from unsupported scan type")
+	}
+	if nn.Valid {
+		t.Fatal("NullNum should be invalid after failed Scan")
+	}
+	if nn.Num.Ok() {
+		t.Fatal("NullNum.Num should not be ok after failed Scan")
 	}
 }
 

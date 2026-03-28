@@ -53,11 +53,11 @@ func Zero() Num {
 	return Num{dec: decimal.MustNew(0, processScale)}
 }
 
-// Ok reports whether the Num has no error.
-func (n Num) Ok() bool { return n.Err == nil }
+// Ok reports whether the Num has no error and its decimal is normalized to the process scale.
+func (n Num) Ok() bool { return n.Err == nil && n.dec.Scale() == processScale }
 
-// IsZero reports whether the Num has no error and its value is zero.
-func (n Num) IsZero() bool { return n.Err == nil && n.dec.IsZero() }
+// IsZero reports whether the Num is ok and its value is zero.
+func (n Num) IsZero() bool { return n.Ok() && n.dec.IsZero() }
 
 // Add returns the sum of n and other with error propagation.
 func (n Num) Add(other Num) Num {
@@ -205,6 +205,8 @@ func (n Num) MarshalText() ([]byte, error) {
 // Delegates to [decimal.Decimal] for XML/Flex report compatibility.
 func (n *Num) UnmarshalText(data []byte) error {
 	if err := n.dec.UnmarshalText(data); err != nil {
+		n.dec = decimal.Decimal{}
+		n.Err = err
 		return err
 	}
 	n.dec = n.dec.Rescale(processScale)
@@ -216,9 +218,13 @@ func (n *Num) UnmarshalText(data []byte) error {
 // Accepts string, []byte, int64, and float64 inputs.
 func (n *Num) Scan(src any) error {
 	if src == nil {
-		return fmt.Errorf("%w: nil", ErrUnsupportedType)
+		n.dec = decimal.Decimal{}
+		n.Err = fmt.Errorf("%w: nil", ErrUnsupportedType)
+		return n.Err
 	}
 	if err := n.dec.Scan(src); err != nil {
+		n.dec = decimal.Decimal{}
+		n.Err = err
 		return err
 	}
 	n.dec = n.dec.Rescale(processScale)
