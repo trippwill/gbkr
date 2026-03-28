@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -596,5 +597,189 @@ func TestSubscribeTrades_ParseError(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for trade update after parse error")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Observer tests — verify StreamObserver callbacks fire in brokerage subscribe
+// ---------------------------------------------------------------------------
+
+type mockStreamObserver struct {
+	mu           sync.Mutex
+	subscribes   []string
+	unsubscribes []string
+	messages     []string
+}
+
+func (m *mockStreamObserver) OnMessageReceived(topic string) {
+	m.mu.Lock()
+	m.messages = append(m.messages, topic)
+	m.mu.Unlock()
+}
+func (m *mockStreamObserver) OnSubscribe(topic string) {
+	m.mu.Lock()
+	m.subscribes = append(m.subscribes, topic)
+	m.mu.Unlock()
+}
+func (m *mockStreamObserver) OnUnsubscribe(topic string) {
+	m.mu.Lock()
+	m.unsubscribes = append(m.unsubscribes, topic)
+	m.mu.Unlock()
+}
+func (m *mockStreamObserver) OnKeepaliveSent(_ error) {}
+
+func (m *mockStreamObserver) snapshot() (subs, unsubs, msgs []string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string{}, m.subscribes...), append([]string{}, m.unsubscribes...), append([]string{}, m.messages...)
+}
+
+func newTestStreamWithObserver(t *testing.T, srv *httptest.Server, obs gbkr.StreamObserver) *gbkr.Stream {
+	t.Helper()
+	client, err := gbkr.NewClient(
+		gbkr.WithBaseURL(srv.URL),
+		gbkr.WithRateLimit(nil),
+		gbkr.WithStreamObserver(obs),
+	)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	stream, err := client.Stream(context.Background())
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	t.Cleanup(func() { stream.Close() })
+	return stream
+}
+
+func TestSubscribeMarketData_Observer(t *testing.T) {
+	srv := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		_, _, _ = conn.Read(context.Background())
+
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"smd+265598","conid":265598,"31":"142.50"}`
+		_ = conn.Write(context.Background(), websocket.MessageText, []byte(msg))
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	obs := &mockStreamObserver{}
+	stream := newTestStreamWithObserver(t, srv, obs)
+
+	ch, cancel, err := brokerage.SubscribeMarketData(stream, 265598, brokerage.FieldLast)
+	if err != nil {
+		t.Fatalf("SubscribeMarketData: %v", err)
+	}
+
+	select {
+	case <-ch:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out")
+	}
+
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+
+	subs, unsubs, msgs := obs.snapshot()
+	if len(subs) != 1 || subs[0] != "smd+265598" {
+		t.Errorf("OnSubscribe = %v, want [smd+265598]", subs)
+	}
+	if len(unsubs) != 1 || unsubs[0] != "smd+265598" {
+		t.Errorf("OnUnsubscribe = %v, want [smd+265598]", unsubs)
+	}
+	if len(msgs) == 0 {
+		t.Error("OnMessageReceived not called")
+	}
+}
+
+func TestSubscribeMarketDataHistory_Observer(t *testing.T) {
+	srv := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		_, _, _ = conn.Read(context.Background())
+
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"smh+265598","t":"20260328 16:00:00","o":"142.50","h":"145.00","l":"141.25","c":"144.75","v":"1250000"}`
+		_ = conn.Write(context.Background(), websocket.MessageText, []byte(msg))
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	obs := &mockStreamObserver{}
+	stream := newTestStreamWithObserver(t, srv, obs)
+
+	ch, cancel, err := brokerage.SubscribeMarketDataHistory(stream, 265598)
+	if err != nil {
+		t.Fatalf("SubscribeMarketDataHistory: %v", err)
+	}
+
+	select {
+	case <-ch:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out")
+	}
+
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+
+	subs, unsubs, msgs := obs.snapshot()
+	if len(subs) != 1 || subs[0] != "smh+265598" {
+		t.Errorf("OnSubscribe = %v, want [smh+265598]", subs)
+	}
+	if len(unsubs) != 1 || unsubs[0] != "smh+265598" {
+		t.Errorf("OnUnsubscribe = %v, want [smh+265598]", unsubs)
+	}
+	if len(msgs) == 0 {
+		t.Error("OnMessageReceived not called")
+	}
+}
+
+func TestSubscribeOrders_Observer(t *testing.T) {
+	srv := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		_, _, _ = conn.Read(context.Background())
+
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"sor","orderId":"123","account":"U1234567","status":"Filled"}`
+		_ = conn.Write(context.Background(), websocket.MessageText, []byte(msg))
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	obs := &mockStreamObserver{}
+	stream := newTestStreamWithObserver(t, srv, obs)
+
+	ch, cancel, err := brokerage.SubscribeOrders(stream)
+	if err != nil {
+		t.Fatalf("SubscribeOrders: %v", err)
+	}
+
+	select {
+	case <-ch:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out")
+	}
+
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+
+	subs, unsubs, msgs := obs.snapshot()
+	if len(subs) != 1 || subs[0] != "sor" {
+		t.Errorf("OnSubscribe = %v, want [sor]", subs)
+	}
+	if len(unsubs) != 1 || unsubs[0] != "sor" {
+		t.Errorf("OnUnsubscribe = %v, want [sor]", unsubs)
+	}
+	if len(msgs) == 0 {
+		t.Error("OnMessageReceived not called")
 	}
 }
