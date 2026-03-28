@@ -15,11 +15,26 @@ import (
 
 const keepaliveInterval = 25 * time.Second
 
+// StreamObserver receives streaming lifecycle and activity notifications.
+// Implementations must be safe for concurrent use.
+type StreamObserver interface {
+	OnMessageReceived(topic string)
+	OnSubscribe(topic string)
+	OnUnsubscribe(topic string)
+	OnKeepaliveSent(err error)
+}
+
 // Stream manages a WebSocket connection to the IBKR Client Portal Gateway
 // for real-time push updates. Obtained via [Client.Stream].
+//
+// Stream does not auto-reconnect. When the underlying WebSocket disconnects,
+// all subscription channels are closed. Consumers should detect channel
+// closure and re-dial via [Client.Stream] with appropriate backoff.
+// See the package-level documentation for a reconnection example.
 type Stream struct {
 	ws        *transport.WSConn
 	client    *Client
+	observer  StreamObserver
 	cancel    context.CancelFunc
 	done      chan struct{}
 	closeOnce sync.Once
@@ -44,10 +59,11 @@ func (c *Client) Stream(ctx context.Context) (*Stream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	s := &Stream{
-		ws:     ws,
-		client: c,
-		cancel: cancel,
-		done:   make(chan struct{}),
+		ws:       ws,
+		client:   c,
+		observer: c.streamObserver,
+		cancel:   cancel,
+		done:     make(chan struct{}),
 	}
 
 	c.emitOp(ctx, OpStreamConnect, nil, time.Since(start))
@@ -84,6 +100,10 @@ func (s *Stream) EmitOp(op Operation, attrs ...slog.Attr) {
 	s.client.emitOp(context.Background(), op, nil, 0, attrs...)
 }
 
+// Observer returns the stream's [StreamObserver], or nil if none was configured.
+// Exposed for cross-package subscription helpers in the brokerage package.
+func (s *Stream) Observer() StreamObserver { return s.observer }
+
 // IsClosed reports whether the stream has been closed explicitly or
 // the underlying WebSocket has disconnected.
 func (s *Stream) IsClosed() bool {
@@ -108,7 +128,10 @@ func (s *Stream) keepalive(ctx context.Context) {
 		case <-s.ws.Done():
 			return
 		case <-ticker.C:
-			_ = s.ws.Send(ctx, "tic")
+			err := s.ws.Send(ctx, "tic")
+			if s.observer != nil {
+				s.observer.OnKeepaliveSent(err)
+			}
 		}
 	}
 }
@@ -153,6 +176,9 @@ func subscribe[T any](s *Stream, topic string, bufSize int, dropOnFull bool, par
 		if !active.Load() {
 			return
 		}
+		if s.observer != nil {
+			s.observer.OnMessageReceived(topic)
+		}
 		if dropOnFull {
 			select {
 			case ch <- v:
@@ -183,6 +209,9 @@ func subscribe[T any](s *Stream, topic string, bufSize int, dropOnFull bool, par
 	allAttrs = append(allAttrs, slog.String("topic", topic))
 	allAttrs = append(allAttrs, attrs...)
 	s.client.emitOp(context.Background(), OpStreamSubscribe, nil, 0, allAttrs...)
+	if s.observer != nil {
+		s.observer.OnSubscribe(topic)
+	}
 
 	var cancelOnce sync.Once
 	cancelFn := func() {
@@ -198,6 +227,9 @@ func subscribe[T any](s *Stream, topic string, bufSize int, dropOnFull bool, par
 			}
 			s.client.emitOp(context.Background(), OpStreamUnsubscribe, nil, 0,
 				slog.String("topic", topic))
+			if s.observer != nil {
+				s.observer.OnUnsubscribe(topic)
+			}
 			close(ch)
 		})
 	}

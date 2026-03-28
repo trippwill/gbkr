@@ -15,6 +15,7 @@ import (
 type Client struct {
 	t              *transport.Transport
 	pacingObserver PacingObserver // staging field; attached to PacingPolicy during init
+	streamObserver StreamObserver // staging field; attached to Stream during Stream()
 	pacingDisabled bool           // set by WithRateLimit(nil) to suppress default init
 	pacing         *PacingPolicy
 }
