@@ -215,6 +215,9 @@ func SubscribeMarketDataHistory(s *gbkr.Stream, conID gbkr.ConID) (updates <-cha
 		cancelOnce.Do(func() {
 			active.Store(false)
 			cancelSub()
+			// TODO: Validate umh unsub protocol against live gateway.
+			// If IBKR requires a server-assigned subscription ID instead
+			// of conid for smh, update this to capture it from the ack.
 			unsub := fmt.Sprintf("umh+%d+{}", conID)
 			unsubCtx, unsubCancel := context.WithTimeout(context.Background(), sendTimeout)
 			defer unsubCancel()

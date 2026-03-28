@@ -189,12 +189,16 @@ func TestSubscribeMarketDataHistory(t *testing.T) {
 }
 
 func TestSubscribeMarketDataHistory_Cancel(t *testing.T) {
+	received := make(chan string, 10)
+
 	srv := testWSServer(t, func(conn *websocket.Conn) {
 		defer conn.Close(websocket.StatusNormalClosure, "")
 		for {
-			if _, _, err := conn.Read(context.Background()); err != nil {
+			_, data, err := conn.Read(context.Background())
+			if err != nil {
 				return
 			}
+			received <- string(data)
 		}
 	})
 
@@ -205,7 +209,27 @@ func TestSubscribeMarketDataHistory_Cancel(t *testing.T) {
 		t.Fatalf("SubscribeMarketDataHistory: %v", err)
 	}
 
+	// Drain the subscribe command.
+	select {
+	case msg := <-received:
+		if msg != "smh+265598" {
+			t.Errorf("subscribe msg = %q, want %q", msg, "smh+265598")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for subscribe command")
+	}
+
 	cancel()
+
+	// Verify the unsubscribe command was sent.
+	select {
+	case msg := <-received:
+		if msg != "umh+265598+{}" {
+			t.Errorf("unsubscribe msg = %q, want %q", msg, "umh+265598+{}")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for unsubscribe command")
+	}
 
 	// Channel should be closed after cancel.
 	select {
