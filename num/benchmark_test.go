@@ -3,6 +3,8 @@ package num
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/govalues/decimal"
 )
 
 func BenchmarkFromString(b *testing.B) {
@@ -66,5 +68,78 @@ func BenchmarkValue(b *testing.B) {
 	n := FromString("123.456789")
 	for b.Loop() {
 		_, _ = n.Value()
+	}
+}
+
+func BenchmarkDecimalParseRescale(b *testing.B) {
+	for b.Loop() {
+		d, _ := decimal.Parse("123.456789")
+		_ = d.Rescale(Scale())
+	}
+}
+
+func BenchmarkDecimalNew(b *testing.B) {
+	for b.Loop() {
+		d, _ := decimal.New(123456, 0)
+		_ = d.Rescale(Scale())
+	}
+}
+
+func BenchmarkDecimalNewFromFloat64(b *testing.B) {
+	for b.Loop() {
+		d, _ := decimal.NewFromFloat64(123.456789)
+		_ = d.Rescale(Scale())
+	}
+}
+
+func BenchmarkDecimalArithmeticChain(b *testing.B) {
+	a := decimal.MustParse("100.50").Rescale(Scale())
+	c := decimal.MustParse("10").Rescale(Scale())
+	d := decimal.MustParse("3").Rescale(Scale())
+	for b.Loop() {
+		sum, _ := a.Add(c)
+		product, _ := sum.Mul(d)
+		diff, _ := product.Sub(a)
+		_, _ = diff.Quo(c)
+	}
+}
+
+func BenchmarkDecimalMarshalJSON(b *testing.B) {
+	d := decimal.MustParse("123.456789").Rescale(Scale())
+	for b.Loop() {
+		_, _ = json.Marshal(d)
+	}
+}
+
+func BenchmarkDecimalUnmarshalJSON_Bare(b *testing.B) {
+	data := []byte("123.456789")
+	for b.Loop() {
+		var d decimal.Decimal
+		_ = d.UnmarshalJSON(data)
+		d = d.Rescale(Scale())
+	}
+}
+
+func BenchmarkDecimalUnmarshalJSON_Quoted(b *testing.B) {
+	data := []byte(`"123.456789"`)
+	for b.Loop() {
+		var d decimal.Decimal
+		_ = d.UnmarshalJSON(data)
+		d = d.Rescale(Scale())
+	}
+}
+
+func BenchmarkDecimalScan(b *testing.B) {
+	for b.Loop() {
+		var d decimal.Decimal
+		_ = d.Scan("123.456789")
+		d = d.Rescale(Scale())
+	}
+}
+
+func BenchmarkDecimalValue(b *testing.B) {
+	d := decimal.MustParse("123.456789").Rescale(Scale())
+	for b.Loop() {
+		_, _ = d.Value()
 	}
 }
