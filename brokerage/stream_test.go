@@ -132,6 +132,110 @@ func TestSubscribeMarketData_Cancel(t *testing.T) {
 	}
 }
 
+func TestSubscribeMarketDataHistory(t *testing.T) {
+	srv := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		// Read the subscribe command.
+		_, _, _ = conn.Read(context.Background())
+
+		// Send a historical bar.
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"smh+265598","t":"20260328 16:00:00","o":"142.50","h":"145.00","l":"141.25","c":"144.75","v":"1250000"}`
+		if err := conn.Write(context.Background(), websocket.MessageText, []byte(msg)); err != nil {
+			return
+		}
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	stream := newTestStream(t, srv)
+
+	ch, cancel, err := brokerage.SubscribeMarketDataHistory(stream, 265598)
+	if err != nil {
+		t.Fatalf("SubscribeMarketDataHistory: %v", err)
+	}
+	defer cancel()
+
+	select {
+	case bar := <-ch:
+		if bar.ConID != 265598 {
+			t.Errorf("ConID = %d, want 265598", bar.ConID)
+		}
+		if bar.Time != "20260328 16:00:00" {
+			t.Errorf("Time = %q, want %q", bar.Time, "20260328 16:00:00")
+		}
+		if len(bar.Open) == 0 {
+			t.Error("Open should not be empty")
+		}
+		if len(bar.High) == 0 {
+			t.Error("High should not be empty")
+		}
+		if len(bar.Low) == 0 {
+			t.Error("Low should not be empty")
+		}
+		if len(bar.Close) == 0 {
+			t.Error("Close should not be empty")
+		}
+		if len(bar.Volume) == 0 {
+			t.Error("Volume should not be empty")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for history bar")
+	}
+}
+
+func TestSubscribeMarketDataHistory_Cancel(t *testing.T) {
+	srv := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	stream := newTestStream(t, srv)
+
+	ch, cancel, err := brokerage.SubscribeMarketDataHistory(stream, 265598)
+	if err != nil {
+		t.Fatalf("SubscribeMarketDataHistory: %v", err)
+	}
+
+	cancel()
+
+	// Channel should be closed after cancel.
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("expected channel to be closed")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for channel close")
+	}
+}
+
+func TestSubscribeMarketDataHistory_ClosedStream(t *testing.T) {
+	srv := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	stream := newTestStream(t, srv)
+	stream.Close()
+
+	_, _, err := brokerage.SubscribeMarketDataHistory(stream, 265598)
+	if err == nil {
+		t.Fatal("expected error on closed stream")
+	}
+}
+
 func TestSubscribeOrders(t *testing.T) {
 	srv := testWSServer(t, func(conn *websocket.Conn) {
 		defer conn.Close(websocket.StatusNormalClosure, "")

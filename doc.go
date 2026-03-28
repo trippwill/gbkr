@@ -37,8 +37,24 @@
 //   - [brokerage.SubscribeOrders] — order status updates (topic: sor)
 //   - [brokerage.SubscribeTrades] — trade execution updates (topic: str)
 //
-// The stream sends keepalive messages automatically. It does not auto-reconnect;
-// consumers observe channel closure on disconnect and may re-dial as needed.
+// The stream sends keepalive messages automatically. It does not auto-reconnect
+// (see ADR-012); consumers observe channel closure on disconnect and re-dial
+// as needed. A typical reconnection loop:
+//
+//	for {
+//	    stream, err := client.Stream(ctx)
+//	    if err != nil {
+//	        time.Sleep(backoff)
+//	        continue
+//	    }
+//	    pnl, cancel, _ := stream.PortfolioPnL(accountID)
+//	    for update := range pnl {
+//	        process(update)
+//	    }
+//	    cancel()
+//	    stream.Close()
+//	    // Channel closed — connection lost. Back off and retry.
+//	}
 //
 // # Capability-to-Path Mapping
 //

@@ -515,3 +515,172 @@ func TestStream_Cancel_Unsubscribes(t *testing.T) {
 		t.Fatal("timed out waiting for unsubscribe command")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// StreamObserver tests
+// ---------------------------------------------------------------------------
+
+type mockStreamObserver struct {
+	mu            sync.Mutex
+	subscribes    []string
+	unsubscribes  []string
+	messages      []string
+	keepalives    int
+	keepaliveErrs int
+}
+
+func (m *mockStreamObserver) OnMessageReceived(topic string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.messages = append(m.messages, topic)
+}
+
+func (m *mockStreamObserver) OnSubscribe(topic string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.subscribes = append(m.subscribes, topic)
+}
+
+func (m *mockStreamObserver) OnUnsubscribe(topic string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.unsubscribes = append(m.unsubscribes, topic)
+}
+
+func (m *mockStreamObserver) OnKeepaliveSent(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.keepalives++
+	if err != nil {
+		m.keepaliveErrs++
+	}
+}
+
+func (m *mockStreamObserver) snapshot() (subscribes, unsubscribes, messages []string, keepalives, keepaliveErrs int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.subscribes...),
+		append([]string(nil), m.unsubscribes...),
+		append([]string(nil), m.messages...),
+		m.keepalives,
+		m.keepaliveErrs
+}
+
+func TestStream_Observer(t *testing.T) {
+	srv, _ := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		// Read subscribe command, then send a notification.
+		if _, _, err := conn.Read(context.Background()); err != nil {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"ntf","id":"obs1","date":"2026-01-20","text":"observer test"}`
+		if err := conn.Write(context.Background(), websocket.MessageText, []byte(msg)); err != nil {
+			return
+		}
+		// Keep reading to accept unsubscribe + keepalive.
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	obs := &mockStreamObserver{}
+
+	client, err := gbkr.NewClient(
+		gbkr.WithBaseURL(srv.URL),
+		gbkr.WithRateLimit(nil),
+		gbkr.WithStreamObserver(obs),
+	)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	stream, err := client.Stream(context.Background())
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	defer stream.Close()
+
+	// Verify Observer() accessor returns the observer.
+	if stream.Observer() != obs {
+		t.Fatal("Observer() returned unexpected value")
+	}
+
+	ch, cancel, err := stream.Notifications()
+	if err != nil {
+		t.Fatalf("Notifications: %v", err)
+	}
+
+	// Wait for the notification message.
+	select {
+	case n := <-ch:
+		if n.ID != "obs1" {
+			t.Errorf("ID = %q, want %q", n.ID, "obs1")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for notification")
+	}
+
+	// Cancel the subscription.
+	cancel()
+
+	// Give async callbacks a moment to complete.
+	time.Sleep(50 * time.Millisecond)
+
+	subscribes, unsubscribes, messages, _, _ := obs.snapshot()
+
+	if len(subscribes) != 1 || subscribes[0] != "ntf" {
+		t.Errorf("subscribes = %v, want [ntf]", subscribes)
+	}
+	if len(unsubscribes) != 1 || unsubscribes[0] != "ntf" {
+		t.Errorf("unsubscribes = %v, want [ntf]", unsubscribes)
+	}
+	if len(messages) < 1 {
+		t.Error("expected at least one OnMessageReceived call")
+	} else if messages[0] != "ntf" {
+		t.Errorf("messages[0] = %q, want %q", messages[0], "ntf")
+	}
+}
+
+func TestStream_Observer_Nil(t *testing.T) {
+	// Verify that a stream without an observer does not panic.
+	srv, _ := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"ntf","id":"n1","date":"2026-01-20","text":"no observer"}`
+		_ = conn.Write(context.Background(), websocket.MessageText, []byte(msg))
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	client := newStreamTestClient(t, srv.URL)
+	stream, err := client.Stream(context.Background())
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	defer stream.Close()
+
+	if stream.Observer() != nil {
+		t.Fatal("Observer() should be nil when not configured")
+	}
+
+	ch, cancel, err := stream.Notifications()
+	if err != nil {
+		t.Fatalf("Notifications: %v", err)
+	}
+	defer cancel()
+
+	select {
+	case n := <-ch:
+		if n.ID != "n1" {
+			t.Errorf("ID = %q, want %q", n.ID, "n1")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for notification")
+	}
+}

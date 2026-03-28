@@ -63,6 +63,15 @@ func WithPacingObserver(obs PacingObserver) Option {
 	}
 }
 
+// WithStreamObserver sets a [StreamObserver] that receives notifications
+// about streaming lifecycle events and message activity.
+func WithStreamObserver(o StreamObserver) Option {
+	return func(c *Client) error {
+		c.streamObserver = o
+		return nil
+	}
+}
+
 // WithLogger sets a custom [*slog.Logger] for operation event emission.
 // The "gbkr" group is always applied to the provided logger.
 // If not set, [slog.Default] is used.

@@ -59,6 +59,9 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 		if !active.Load() {
 			return
 		}
+		if obs := s.Observer(); obs != nil {
+			obs.OnMessageReceived(topic)
+		}
 		var raw map[string]json.RawMessage
 		if err := json.Unmarshal(data, &raw); err != nil {
 			return
@@ -103,6 +106,9 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 	s.EmitOp(gbkr.OpStreamSubscribe,
 		slog.String("topic", topic),
 		slog.Int("conid", int(conID)))
+	if obs := s.Observer(); obs != nil {
+		obs.OnSubscribe(topic)
+	}
 
 	var cancelOnce sync.Once
 	cancelFn := func() {
@@ -116,6 +122,109 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 			s.EmitOp(gbkr.OpStreamUnsubscribe,
 				slog.String("topic", topic),
 				slog.Int("conid", int(conID)))
+			if obs := s.Observer(); obs != nil {
+				obs.OnUnsubscribe(topic)
+			}
+			close(ch)
+		})
+	}
+
+	go func() {
+		<-ws.Done()
+		cancelFn()
+	}()
+
+	return ch, cancelFn, nil
+}
+
+// HistorySubscriptionBar represents a streaming historical bar update.
+// Topic: smh+{conid}. Numeric fields use [json.RawMessage] to preserve
+// the gateway's flexible encoding (string or number).
+type HistorySubscriptionBar struct {
+	ConID  gbkr.ConID      `json:"-"`
+	Time   string          `json:"t"`
+	Open   json.RawMessage `json:"o"`
+	High   json.RawMessage `json:"h"`
+	Low    json.RawMessage `json:"l"`
+	Close  json.RawMessage `json:"c"`
+	Volume json.RawMessage `json:"v"`
+}
+
+// SubscribeMarketDataHistory subscribes to streaming historical bar updates
+// for the given contract. Topic: smh+{conid}.
+//
+// Uses drop-oldest semantics with a 64-element buffer (lossy-ok).
+func SubscribeMarketDataHistory(s *gbkr.Stream, conID gbkr.ConID) (updates <-chan HistorySubscriptionBar, cancel func(), err error) {
+	if s.IsClosed() {
+		return nil, nil, gbkr.ErrStreamNotConnected
+	}
+
+	topic := fmt.Sprintf("smh+%d", conID)
+	subCmd := topic
+
+	ws := s.WsConn()
+	ch := make(chan HistorySubscriptionBar, 64)
+
+	var (
+		cancelSub func()
+		active    *atomic.Bool
+	)
+	cancelSub, active = ws.Subscribe(topic, func(data json.RawMessage) {
+		if !active.Load() {
+			return
+		}
+		var bar HistorySubscriptionBar
+		if err := json.Unmarshal(data, &bar); err != nil {
+			return
+		}
+		bar.ConID = conID
+
+		if obs := s.Observer(); obs != nil {
+			obs.OnMessageReceived(topic)
+		}
+
+		// Drop oldest on overflow (historical bars are lossy-ok).
+		select {
+		case ch <- bar:
+		default:
+			select {
+			case <-ch:
+			default:
+			}
+			ch <- bar
+		}
+	})
+
+	sendCtx, sendCancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer sendCancel()
+	if err := ws.Send(sendCtx, subCmd); err != nil {
+		active.Store(false)
+		cancelSub()
+		close(ch)
+		return nil, nil, fmt.Errorf("subscribe %s: %w", topic, err)
+	}
+	s.EmitOp(gbkr.OpStreamSubscribe,
+		slog.String("topic", topic),
+		slog.Int("conid", int(conID)))
+	if obs := s.Observer(); obs != nil {
+		obs.OnSubscribe(topic)
+	}
+
+	var cancelOnce sync.Once
+	cancelFn := func() {
+		cancelOnce.Do(func() {
+			active.Store(false)
+			cancelSub()
+			unsub := fmt.Sprintf("umh+%d+{}", conID)
+			unsubCtx, unsubCancel := context.WithTimeout(context.Background(), sendTimeout)
+			defer unsubCancel()
+			_ = ws.Send(unsubCtx, unsub)
+			s.EmitOp(gbkr.OpStreamUnsubscribe,
+				slog.String("topic", topic),
+				slog.Int("conid", int(conID)))
+			if obs := s.Observer(); obs != nil {
+				obs.OnUnsubscribe(topic)
+			}
 			close(ch)
 		})
 	}
@@ -201,6 +310,9 @@ func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int
 		if !active.Load() {
 			return
 		}
+		if obs := s.Observer(); obs != nil {
+			obs.OnMessageReceived(topic)
+		}
 		ch <- v
 	})
 
@@ -213,6 +325,9 @@ func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int
 		return nil, nil, fmt.Errorf("subscribe %s: %w", topic, err)
 	}
 	s.EmitOp(gbkr.OpStreamSubscribe, slog.String("topic", topic))
+	if obs := s.Observer(); obs != nil {
+		obs.OnSubscribe(topic)
+	}
 
 	var cancelOnce sync.Once
 	cancelFn := func() {
@@ -226,6 +341,9 @@ func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int
 				_ = ws.Send(unsubCtx, unsub)
 			}
 			s.EmitOp(gbkr.OpStreamUnsubscribe, slog.String("topic", topic))
+			if obs := s.Observer(); obs != nil {
+				obs.OnUnsubscribe(topic)
+			}
 			close(ch)
 		})
 	}
