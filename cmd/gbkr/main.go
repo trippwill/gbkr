@@ -179,7 +179,8 @@ func main() {
 
 		fmt.Printf("Listening for %v...\n", *streamDuration)
 
-		timer := time.After(*streamDuration)
+		timer := time.NewTimer(*streamDuration)
+		defer timer.Stop()
 		for {
 			select {
 			case u, ok := <-pnlUpdates:
@@ -201,7 +202,7 @@ func main() {
 					continue
 				}
 				fmt.Printf("[MarketData] conid=%d fields=%v\n", u.ConID, u.Fields)
-			case <-timer:
+			case <-timer.C:
 				fmt.Println("Stream duration elapsed.")
 				return
 			case <-ctx.Done():
