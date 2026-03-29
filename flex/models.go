@@ -1,111 +1,119 @@
 package flex
 
-// QueryResponse is the top-level XML envelope returned by the Flex Web
-// Service GetStatement endpoint for a successfully generated report.
+import "github.com/trippwill/gbkr/num"
+
+// QueryResponse is the top-level envelope returned by the Flex Web Service
+// GetStatement endpoint for a successfully generated report.
 type QueryResponse struct {
-	QueryName  string      `xml:"queryName,attr"`
-	Type       string      `xml:"type,attr"`
-	Statements []Statement `xml:"FlexStatements>FlexStatement"`
+	QueryName  string
+	Type       string
+	Statements []Statement
 }
 
 // Statement contains the report data for a single account.
 type Statement struct {
-	AccountID     string `xml:"accountId,attr"`
-	FromDate      string `xml:"fromDate,attr"`
-	ToDate        string `xml:"toDate,attr"`
-	Period        string `xml:"period,attr"`
-	WhenGenerated string `xml:"whenGenerated,attr"`
+	AccountID     string
+	FromDate      string
+	ToDate        string
+	Period        string
+	WhenGenerated string
 
-	Trades            []Trade            `xml:"Trades>Trade"`
-	CashTransactions  []CashTransaction  `xml:"CashTransactions>CashTransaction"`
-	OptionEvents      []OptionEvent      `xml:"OptionEAE>OptionEAE"`
-	CommissionDetails []CommissionDetail `xml:"CommissionDetails>CommissionDetail"`
+	Trades            []Trade
+	CashTransactions  []CashTransaction
+	OptionEvents      []OptionEvent
+	CommissionDetails []CommissionDetail
 }
 
 // Trade represents a single execution from the Trades section of an
-// Activity Flex Query. Fields use IBKR's camelCase attribute names.
+// Activity Flex Query.
+//
+// Financial fields use [num.Num] for exact decimal arithmetic. Fields that may
+// be absent from the Flex XML (depending on query template configuration) use
+// [num.NullNum]. Field names use domain vocabulary; the original IBKR Flex
+// attribute name is noted where they differ.
 type Trade struct {
-	TransactionID      string  `xml:"transactionID,attr"`
-	TradeID            string  `xml:"tradeID,attr"`
-	IBOrderID          string  `xml:"ibOrderID,attr"`
-	IBExecID           string  `xml:"ibExecID,attr"`
-	AccountID          string  `xml:"accountId,attr"`
-	ConID              int64   `xml:"conid,attr"`
-	Symbol             string  `xml:"symbol,attr"`
-	UnderlyingSymbol   string  `xml:"underlyingSymbol,attr"`
-	UnderlyingConID    int64   `xml:"underlyingConid,attr"`
-	AssetCategory      string  `xml:"assetCategory,attr"`
-	BuySell            string  `xml:"buySell,attr"`
-	Quantity           float64 `xml:"quantity,attr"`
-	TradePrice         float64 `xml:"tradePrice,attr"`
-	TradeMoney         float64 `xml:"tradeMoney,attr"`
-	Proceeds           float64 `xml:"proceeds,attr"`
-	IBCommission       float64 `xml:"ibCommission,attr"`
-	Taxes              float64 `xml:"taxes,attr"`
-	NetCash            float64 `xml:"netCash,attr"`
-	FIFOPnlRealized    float64 `xml:"fifoPnlRealized,attr"`
-	CostBasis          float64 `xml:"costBasis,attr"`
-	Strike             float64 `xml:"strike,attr"`
-	Expiry             string  `xml:"expiry,attr"`
-	PutCall            string  `xml:"putCall,attr"`
-	OpenCloseIndicator string  `xml:"openCloseIndicator,attr"`
-	OrderReference     string  `xml:"orderReference,attr"`
-	TradeDate          string  `xml:"tradeDate,attr"`
-	SettleDate         string  `xml:"settleDate,attr"`
-	Currency           string  `xml:"currency,attr"`
-	Multiplier         float64 `xml:"multiplier,attr"`
+	TransactionID string      // IBKR: transactionID
+	TradeID       string      // IBKR: tradeID
+	OrderID       string      // IBKR: ibOrderID
+	ExecID        string      // IBKR: ibExecID
+	AccountID     string      // IBKR: accountId
+	ConID         int64       // IBKR: conid — contract identifier
+	Symbol        string      // IBKR: symbol
+	Underlying    string      // IBKR: underlyingSymbol — empty for non-derivative trades
+	UnderlyingID  int64       // IBKR: underlyingConid — 0 for non-derivative trades
+	AssetClass    string      // IBKR: assetCategory — "STK", "OPT", etc.
+	Side          string      // IBKR: buySell — "BUY" or "SELL"
+	Quantity      num.Num     // Signed: positive for buys, negative for sells
+	Price         num.Num     // IBKR: tradePrice — per-unit execution price
+	TradeMoney    num.Num     // IBKR: tradeMoney — quantity × price
+	Proceeds      num.Num     // Net proceeds (negative for buys)
+	Commission    num.Num     // IBKR: ibCommission — typically negative
+	Taxes         num.Num     // Regulatory taxes
+	NetCash       num.NullNum // Net cash impact; absent if not in query template
+	CostBasis     num.NullNum // FIFO cost basis; absent if not computed
+	RealizedPnL   num.NullNum // IBKR: fifoPnlRealized — FIFO realized P&L
+	Strike        num.NullNum // Option strike price; absent for stock trades
+	Expiry        string      // Option expiry date; empty for stock trades
+	PutCall       string      // "C" or "P" for options; empty for stock trades
+	OpenClose     string      // IBKR: openCloseIndicator — "O" or "C"
+	OrderRef      string      // IBKR: orderReference — user-assigned order ref
+	Currency      string      // Settlement currency (e.g., "USD")
+	Multiplier    num.Num     // Contract multiplier (1 for stock, 100 for US equity options)
+	TradeDate     string      // Execution date
+	SettleDate    string      // Settlement date; may be empty
 }
 
 // CashTransaction represents a dividend, interest charge, fee, or other
-// cash movement from the Cash Transactions section.
+// cash movement from the Cash Transactions section of an Activity Flex Query.
 type CashTransaction struct {
-	TransactionID string  `xml:"transactionID,attr"`
-	AccountID     string  `xml:"accountId,attr"`
-	ConID         int64   `xml:"conid,attr"`
-	Symbol        string  `xml:"symbol,attr"`
-	Type          string  `xml:"type,attr"`
-	Amount        float64 `xml:"amount,attr"`
-	Currency      string  `xml:"currency,attr"`
-	Description   string  `xml:"description,attr"`
-	ReportDate    string  `xml:"reportDate,attr"`
-	SettleDate    string  `xml:"settleDate,attr"`
+	TransactionID string  // IBKR: transactionID — may be empty on SUMMARY rows
+	AccountID     string  // IBKR: accountId
+	ConID         int64   // IBKR: conid — 0 for account-level entries (e.g., margin interest)
+	Symbol        string  // IBKR: symbol — empty for account-level entries
+	Type          string  // IBKR: type — "Dividends", "Withholding Tax", "Broker Interest Paid", etc.
+	Amount        num.Num // Signed: positive for credits, negative for debits
+	Currency      string  // Settlement currency
+	Description   string  // IBKR: description — human-readable details
+	ReportDate    string  // Date the transaction was reported
+	SettleDate    string  // Settlement date
 }
 
 // OptionEvent represents an option exercise, assignment, or expiration
-// from the Option Exercises, Assignments & Expirations section.
+// from the Option Exercises, Assignments & Expirations (OptionEAE) section.
 type OptionEvent struct {
-	TransactionType  string  `xml:"transactionType,attr"`
-	AccountID        string  `xml:"accountId,attr"`
-	ConID            int64   `xml:"conid,attr"`
-	Symbol           string  `xml:"symbol,attr"`
-	UnderlyingSymbol string  `xml:"underlyingSymbol,attr"`
-	UnderlyingConID  int64   `xml:"underlyingConid,attr"`
-	Strike           float64 `xml:"strike,attr"`
-	Expiry           string  `xml:"expiry,attr"`
-	PutCall          string  `xml:"putCall,attr"`
-	Quantity         float64 `xml:"quantity,attr"`
-	Proceeds         float64 `xml:"proceeds,attr"`
-	RealizedPnl      float64 `xml:"realizedPnl,attr"`
-	TradeDate        string  `xml:"tradeDate,attr"`
-	Currency         string  `xml:"currency,attr"`
-	Multiplier       float64 `xml:"multiplier,attr"`
+	TransactionType string  // "Exercise", "Assignment", or "Expiration"
+	AccountID       string  // IBKR: accountId
+	ConID           int64   // IBKR: conid — option contract identifier
+	Symbol          string  // IBKR: symbol — OCC-style option symbol
+	Underlying      string  // IBKR: underlyingSymbol
+	UnderlyingID    int64   // IBKR: underlyingConid
+	Strike          num.Num // Option strike price
+	Expiry          string  // Option expiry date
+	PutCall         string  // "C" or "P"
+	Quantity        num.Num // Signed: positive for long, negative for short
+	Proceeds        num.Num // Cash proceeds from the event
+	RealizedPnL     num.Num // IBKR: realizedPnl
+	TradeDate       string  // Date the event occurred
+	Currency        string  // Settlement currency
+	Multiplier      num.Num // Contract multiplier (typically 100)
 }
 
 // CommissionDetail provides a granular fee breakdown for a single trade
-// from the Commission Details section.
+// from the Commission Details section. All charge fields are [num.Num]
+// representing the dollar amount of each fee component.
 type CommissionDetail struct {
-	AccountID                  string  `xml:"accountId,attr"`
-	ConID                      int64   `xml:"conid,attr"`
-	Symbol                     string  `xml:"symbol,attr"`
-	TradeID                    string  `xml:"tradeID,attr"`
-	ExecID                     string  `xml:"execID,attr"`
-	BrokerExecutionCharge      float64 `xml:"brokerExecutionCharge,attr"`
-	BrokerClearingCharge       float64 `xml:"brokerClearingCharge,attr"`
-	ThirdPartyExecutionCharge  float64 `xml:"thirdPartyExecutionCharge,attr"`
-	RegFINRATradingActivityFee float64 `xml:"regFINRATradingActivityFee,attr"`
-	RegSection31TransactionFee float64 `xml:"regSection31TransactionFee,attr"`
-	Currency                   string  `xml:"currency,attr"`
-	TradeDate                  string  `xml:"tradeDate,attr"`
+	AccountID                  string  // IBKR: accountId
+	ConID                      int64   // IBKR: conid
+	Symbol                     string  // IBKR: symbol
+	TradeID                    string  // IBKR: tradeID — links to [Trade.TradeID]
+	ExecID                     string  // IBKR: execID — links to [Trade.ExecID]
+	BrokerExecutionCharge      num.Num // Broker execution fee
+	BrokerClearingCharge       num.Num // Broker clearing fee
+	ThirdPartyExecutionCharge  num.Num // Exchange/third-party execution fee
+	RegFINRATradingActivityFee num.Num // FINRA TAF
+	RegSection31TransactionFee num.Num // SEC Section 31 fee
+	Currency                   string  // Fee currency
+	TradeDate                  string  // Trade execution date
 }
 
 // sendRequestResponse is the XML envelope returned by the SendRequest endpoint.
