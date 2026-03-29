@@ -34,6 +34,9 @@ const (
 	// ErrWrongFormat indicates the Flex query is not configured for XML output.
 	// To fix: edit the query in IBKR Client Portal → Flex Queries and set Format to XML.
 	ErrWrongFormat = Error("flex query is returning CSV; change Format to XML in the IBKR Flex query template")
+
+	// ErrFieldParse indicates one or more fields failed to parse during wire → domain mapping.
+	ErrFieldParse = Error("flex field parse error")
 )
 
 // ResponseError wraps an error code and message from a FlexStatementResponse.
