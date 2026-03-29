@@ -438,3 +438,205 @@ func TestParseActivityStatement_ZeroValueNumerics(t *testing.T) {
 		t.Errorf("CostBasis should be zero, got %s", tr.CostBasis.Num)
 	}
 }
+
+func TestFieldError_Error(t *testing.T) {
+	fe := FieldError{
+		Type:  "Trade",
+		Index: 2,
+		Field: "Quantity",
+		Raw:   "abc",
+		Err:   fmt.Errorf("bad number"),
+	}
+	got := fe.Error()
+	if !strings.Contains(got, "Trade[2].Quantity") {
+		t.Errorf("FieldError.Error() = %q, want substring %q", got, "Trade[2].Quantity")
+	}
+	if !strings.Contains(got, `"abc"`) {
+		t.Errorf("FieldError.Error() = %q, want substring %q", got, `"abc"`)
+	}
+	if !errors.Is(fe, ErrFieldParse) {
+		t.Errorf("FieldError should unwrap to ErrFieldParse")
+	}
+}
+
+func TestFieldErrors_Error(t *testing.T) {
+	errs := FieldErrors{
+		{Type: "Trade", Index: 0, Field: "Quantity", Raw: "abc", Err: fmt.Errorf("bad")},
+		{Type: "Trade", Index: 1, Field: "Price", Raw: "xyz", Err: fmt.Errorf("bad")},
+	}
+	got := errs.Error()
+	if !strings.Contains(got, "2 field parse error(s):") {
+		t.Errorf("FieldErrors.Error() = %q, want header with count 2", got)
+	}
+	if !strings.Contains(got, "Trade[0].Quantity") {
+		t.Errorf("FieldErrors.Error() missing first error detail")
+	}
+	if !strings.Contains(got, "Trade[1].Price") {
+		t.Errorf("FieldErrors.Error() missing second error detail")
+	}
+	if !errors.Is(errs, ErrFieldParse) {
+		t.Errorf("FieldErrors should unwrap to ErrFieldParse")
+	}
+}
+
+func TestParseActivityStatement_InvalidConID(t *testing.T) {
+	// Invalid conid in a Trade triggers parseInt64 error → mapTrade error → mapStatement error.
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <Trades>
+        <Trade transactionID="T1" tradeID="T1" ibOrderID="" ibExecID="" accountId="U1" conid="not_a_number" symbol="X" underlyingSymbol="" underlyingConid="0" assetCategory="STK" buySell="BUY" quantity="1" tradePrice="1" tradeMoney="1" proceeds="1" ibCommission="0" taxes="0" netCash="1" fifoPnlRealized="" costBasis="" strike="" expiry="" putCall="" openCloseIndicator="" orderReference="" tradeDate="2026-01-01" settleDate="" currency="USD" multiplier="1" />
+      </Trades>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for invalid conid")
+	}
+	if !strings.Contains(err.Error(), "conid") {
+		t.Errorf("error = %q, want mention of conid", err.Error())
+	}
+}
+
+func TestParseActivityStatement_InvalidUnderlyingConID(t *testing.T) {
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <Trades>
+        <Trade transactionID="T1" tradeID="T1" ibOrderID="" ibExecID="" accountId="U1" conid="1" symbol="X" underlyingSymbol="" underlyingConid="bad" assetCategory="STK" buySell="BUY" quantity="1" tradePrice="1" tradeMoney="1" proceeds="1" ibCommission="0" taxes="0" netCash="1" fifoPnlRealized="" costBasis="" strike="" expiry="" putCall="" openCloseIndicator="" orderReference="" tradeDate="2026-01-01" settleDate="" currency="USD" multiplier="1" />
+      </Trades>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for invalid underlyingConid")
+	}
+	if !strings.Contains(err.Error(), "underlyingConid") {
+		t.Errorf("error = %q, want mention of underlyingConid", err.Error())
+	}
+}
+
+func TestParseActivityStatement_InvalidCashTransactionConID(t *testing.T) {
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <CashTransactions>
+        <CashTransaction transactionID="C1" accountId="U1" conid="bad" symbol="X" type="Dividends" amount="1.00" currency="USD" description="DIV" reportDate="2026-01-01" settleDate="2026-01-01" />
+      </CashTransactions>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for invalid cash transaction conid")
+	}
+	if !strings.Contains(err.Error(), "conid") {
+		t.Errorf("error = %q, want mention of conid", err.Error())
+	}
+}
+
+func TestParseActivityStatement_InvalidOptionEventConID(t *testing.T) {
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <OptionEAE>
+        <OptionEAE transactionType="Assignment" accountId="U1" conid="bad" symbol="X" underlyingSymbol="X" underlyingConid="1" strike="100" expiry="2026-01-01" putCall="C" quantity="1" proceeds="100" realizedPnl="0" tradeDate="2026-01-01" currency="USD" multiplier="100" />
+      </OptionEAE>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for invalid option event conid")
+	}
+	if !strings.Contains(err.Error(), "conid") {
+		t.Errorf("error = %q, want mention of conid", err.Error())
+	}
+}
+
+func TestParseActivityStatement_InvalidOptionEventUnderlyingConID(t *testing.T) {
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <OptionEAE>
+        <OptionEAE transactionType="Assignment" accountId="U1" conid="1" symbol="X" underlyingSymbol="X" underlyingConid="bad" strike="100" expiry="2026-01-01" putCall="C" quantity="1" proceeds="100" realizedPnl="0" tradeDate="2026-01-01" currency="USD" multiplier="100" />
+      </OptionEAE>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for invalid option event underlyingConid")
+	}
+	if !strings.Contains(err.Error(), "underlyingConid") {
+		t.Errorf("error = %q, want mention of underlyingConid", err.Error())
+	}
+}
+
+func TestParseActivityStatement_InvalidCommissionDetailConID(t *testing.T) {
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <CommissionDetails>
+        <CommissionDetail accountId="U1" conid="bad" symbol="X" tradeID="T1" execID="E1" brokerExecutionCharge="0.50" brokerClearingCharge="0" thirdPartyExecutionCharge="0" regFINRATradingActivityFee="0" regSection31TransactionFee="0" currency="USD" tradeDate="2026-01-01" />
+      </CommissionDetails>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for invalid commission detail conid")
+	}
+	if !strings.Contains(err.Error(), "conid") {
+		t.Errorf("error = %q, want mention of conid", err.Error())
+	}
+}
+
+func TestParseActivityStatement_InvalidNullNumField(t *testing.T) {
+	// A non-numeric value in a NullNum field (strike) should produce a
+	// FieldErrors from validation via checkNullNum.
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <Trades>
+        <Trade transactionID="T1" tradeID="T1" ibOrderID="" ibExecID="" accountId="U1" conid="1" symbol="X" underlyingSymbol="" underlyingConid="0" assetCategory="OPT" buySell="BUY" quantity="1" tradePrice="1" tradeMoney="1" proceeds="1" ibCommission="0" taxes="0" netCash="" fifoPnlRealized="" costBasis="" strike="not_a_number" expiry="" putCall="C" openCloseIndicator="" orderReference="" tradeDate="2026-01-01" settleDate="" currency="USD" multiplier="1" />
+      </Trades>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for invalid NullNum field")
+	}
+
+	var fieldErrs FieldErrors
+	if !errors.As(err, &fieldErrs) {
+		t.Fatalf("expected FieldErrors, got %T: %v", err, err)
+	}
+
+	foundStrike := false
+	for _, fe := range fieldErrs {
+		if fe.Field == "Strike" {
+			foundStrike = true
+		}
+	}
+	if !foundStrike {
+		t.Errorf("expected FieldError for Strike, got: %v", fieldErrs)
+	}
+}
