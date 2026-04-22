@@ -40,106 +40,6 @@ func (fe FieldErrors) Error() string {
 
 func (fe FieldErrors) Unwrap() error { return ErrFieldParse }
 
-// Wire types — co-located with the parsing logic that uses them.
-// All fields are string because XML attributes deserialize as text;
-// num.FromString handles numeric parsing uniformly.
-
-type xmlQueryResponse struct {
-	QueryName  string         `xml:"queryName,attr"`
-	Type       string         `xml:"type,attr"`
-	Statements []xmlStatement `xml:"FlexStatements>FlexStatement"`
-}
-
-type xmlStatement struct {
-	AccountID     string                `xml:"accountId,attr"`
-	FromDate      string                `xml:"fromDate,attr"`
-	ToDate        string                `xml:"toDate,attr"`
-	Period        string                `xml:"period,attr"`
-	WhenGenerated string                `xml:"whenGenerated,attr"`
-	Trades        []xmlTrade            `xml:"Trades>Trade"`
-	CashTxns      []xmlCashTransaction  `xml:"CashTransactions>CashTransaction"`
-	OptionEvents  []xmlOptionEvent      `xml:"OptionEAE>OptionEAE"`
-	Commissions   []xmlCommissionDetail `xml:"CommissionDetails>CommissionDetail"`
-}
-
-type xmlTrade struct {
-	TransactionID      string `xml:"transactionID,attr"`
-	TradeID            string `xml:"tradeID,attr"`
-	IBOrderID          string `xml:"ibOrderID,attr"`
-	IBExecID           string `xml:"ibExecID,attr"`
-	AccountID          string `xml:"accountId,attr"`
-	ConID              string `xml:"conid,attr"`
-	Symbol             string `xml:"symbol,attr"`
-	UnderlyingSymbol   string `xml:"underlyingSymbol,attr"`
-	UnderlyingConID    string `xml:"underlyingConid,attr"`
-	AssetCategory      string `xml:"assetCategory,attr"`
-	BuySell            string `xml:"buySell,attr"`
-	Quantity           string `xml:"quantity,attr"`
-	TradePrice         string `xml:"tradePrice,attr"`
-	TradeMoney         string `xml:"tradeMoney,attr"`
-	Proceeds           string `xml:"proceeds,attr"`
-	IBCommission       string `xml:"ibCommission,attr"`
-	Taxes              string `xml:"taxes,attr"`
-	NetCash            string `xml:"netCash,attr"`
-	FIFOPnlRealized    string `xml:"fifoPnlRealized,attr"`
-	CostBasis          string `xml:"costBasis,attr"`
-	Strike             string `xml:"strike,attr"`
-	Expiry             string `xml:"expiry,attr"`
-	PutCall            string `xml:"putCall,attr"`
-	OpenCloseIndicator string `xml:"openCloseIndicator,attr"`
-	OrderReference     string `xml:"orderReference,attr"`
-	TradeDate          string `xml:"tradeDate,attr"`
-	SettleDate         string `xml:"settleDate,attr"`
-	Currency           string `xml:"currency,attr"`
-	Multiplier         string `xml:"multiplier,attr"`
-}
-
-type xmlCashTransaction struct {
-	TransactionID string `xml:"transactionID,attr"`
-	AccountID     string `xml:"accountId,attr"`
-	ConID         string `xml:"conid,attr"`
-	Symbol        string `xml:"symbol,attr"`
-	Type          string `xml:"type,attr"`
-	Amount        string `xml:"amount,attr"`
-	Currency      string `xml:"currency,attr"`
-	Description   string `xml:"description,attr"`
-	ReportDate    string `xml:"reportDate,attr"`
-	SettleDate    string `xml:"settleDate,attr"`
-}
-
-type xmlOptionEvent struct {
-	TransactionType  string `xml:"transactionType,attr"`
-	AccountID        string `xml:"accountId,attr"`
-	ConID            string `xml:"conid,attr"`
-	Symbol           string `xml:"symbol,attr"`
-	UnderlyingSymbol string `xml:"underlyingSymbol,attr"`
-	UnderlyingConID  string `xml:"underlyingConid,attr"`
-	Strike           string `xml:"strike,attr"`
-	Expiry           string `xml:"expiry,attr"`
-	PutCall          string `xml:"putCall,attr"`
-	Quantity         string `xml:"quantity,attr"`
-	Proceeds         string `xml:"proceeds,attr"`
-	RealizedPnl      string `xml:"realizedPnl,attr"`
-	TradeDate        string `xml:"tradeDate,attr"`
-	Currency         string `xml:"currency,attr"`
-	Multiplier       string `xml:"multiplier,attr"`
-}
-
-type xmlCommissionDetail struct {
-	AccountID                  string `xml:"accountId,attr"`
-	ConID                      string `xml:"conid,attr"`
-	Symbol                     string `xml:"symbol,attr"`
-	TradeID                    string `xml:"tradeID,attr"`
-	ExecID                     string `xml:"execID,attr"`
-	BrokerExecutionCharge      string `xml:"brokerExecutionCharge,attr"`
-	BrokerClearingCharge       string `xml:"brokerClearingCharge,attr"`
-	ThirdPartyExecutionCharge  string `xml:"thirdPartyExecutionCharge,attr"`
-	RegFINRATradingActivityFee string `xml:"regFINRATradingActivityFee,attr"`
-	RegSection31TransactionFee string `xml:"regSection31TransactionFee,attr"`
-	Currency                   string `xml:"currency,attr"`
-	TradeDate                  string `xml:"tradeDate,attr"`
-}
-
 // ParseActivityStatement decodes an Activity Flex Query XML response from r
 // into a [QueryResponse]. Missing optional sections (Trades, CashTransactions,
 // etc.) produce empty slices rather than errors.
@@ -251,12 +151,12 @@ func mapTrade(w xmlTrade) (Trade, error) {
 		UnderlyingID:  underlyingID,
 		AssetClass:    w.AssetCategory,
 		Side:          w.BuySell,
-		Quantity:      num.FromString(w.Quantity),
-		Price:         num.FromString(w.TradePrice),
-		TradeMoney:    num.FromString(w.TradeMoney),
-		Proceeds:      num.FromString(w.Proceeds),
-		Commission:    num.FromString(w.IBCommission),
-		Taxes:         num.FromString(w.Taxes),
+		Quantity:      parseNum(w.Quantity),
+		Price:         parseNum(w.TradePrice),
+		TradeMoney:    parseNum(w.TradeMoney),
+		Proceeds:      parseNum(w.Proceeds),
+		Commission:    parseNum(w.IBCommission),
+		Taxes:         parseNum(w.Taxes),
 		NetCash:       parseNullNum(w.NetCash),
 		CostBasis:     parseNullNum(w.CostBasis),
 		RealizedPnL:   parseNullNum(w.FIFOPnlRealized),
@@ -266,7 +166,7 @@ func mapTrade(w xmlTrade) (Trade, error) {
 		OpenClose:     w.OpenCloseIndicator,
 		OrderRef:      w.OrderReference,
 		Currency:      w.Currency,
-		Multiplier:    num.FromString(w.Multiplier),
+		Multiplier:    parseNum(w.Multiplier),
 		TradeDate:     w.TradeDate,
 		SettleDate:    w.SettleDate,
 	}, nil
@@ -284,7 +184,7 @@ func mapCashTransaction(w xmlCashTransaction) (CashTransaction, error) {
 		ConID:         conID,
 		Symbol:        w.Symbol,
 		Type:          w.Type,
-		Amount:        num.FromString(w.Amount),
+		Amount:        parseNum(w.Amount),
 		Currency:      w.Currency,
 		Description:   w.Description,
 		ReportDate:    w.ReportDate,
@@ -310,15 +210,15 @@ func mapOptionEvent(w xmlOptionEvent) (OptionEvent, error) {
 		Symbol:          w.Symbol,
 		Underlying:      w.UnderlyingSymbol,
 		UnderlyingID:    underlyingID,
-		Strike:          num.FromString(w.Strike),
+		Strike:          parseNum(w.Strike),
 		Expiry:          w.Expiry,
 		PutCall:         w.PutCall,
-		Quantity:        num.FromString(w.Quantity),
-		Proceeds:        num.FromString(w.Proceeds),
-		RealizedPnL:     num.FromString(w.RealizedPnl),
+		Quantity:        parseNum(w.Quantity),
+		Proceeds:        parseNum(w.Proceeds),
+		RealizedPnL:     parseNum(w.RealizedPnl),
 		TradeDate:       w.TradeDate,
 		Currency:        w.Currency,
-		Multiplier:      num.FromString(w.Multiplier),
+		Multiplier:      parseNum(w.Multiplier),
 	}, nil
 }
 
@@ -334,18 +234,26 @@ func mapCommissionDetail(w xmlCommissionDetail) (CommissionDetail, error) {
 		Symbol:                     w.Symbol,
 		TradeID:                    w.TradeID,
 		ExecID:                     w.ExecID,
-		BrokerExecutionCharge:      num.FromString(w.BrokerExecutionCharge),
-		BrokerClearingCharge:       num.FromString(w.BrokerClearingCharge),
-		ThirdPartyExecutionCharge:  num.FromString(w.ThirdPartyExecutionCharge),
-		RegFINRATradingActivityFee: num.FromString(w.RegFINRATradingActivityFee),
-		RegSection31TransactionFee: num.FromString(w.RegSection31TransactionFee),
+		BrokerExecutionCharge:      parseNum(w.BrokerExecutionCharge),
+		BrokerClearingCharge:       parseNum(w.BrokerClearingCharge),
+		ThirdPartyExecutionCharge:  parseNum(w.ThirdPartyExecutionCharge),
+		RegFINRATradingActivityFee: parseNum(w.RegFINRATradingActivityFee),
+		RegSection31TransactionFee: parseNum(w.RegSection31TransactionFee),
 		Currency:                   w.Currency,
 		TradeDate:                  w.TradeDate,
 	}, nil
 }
 
+// parseNum trims whitespace and parses s as a Num.
+// XML attributes may carry incidental whitespace; trimming here keeps
+// num.FromString strict while the flex layer is lenient.
+func parseNum(s string) num.Num {
+	return num.FromString(strings.TrimSpace(s))
+}
+
 // parseInt64 parses s as a base-10 int64. Empty string and "0" both return 0.
 func parseInt64(s, field string) (int64, error) {
+	s = strings.TrimSpace(s)
 	if s == "" || s == "0" {
 		return 0, nil
 	}
@@ -357,8 +265,9 @@ func parseInt64(s, field string) (int64, error) {
 }
 
 // parseNullNum maps an XML string to a NullNum.
-// Empty string → NullNum{Valid: false}; non-empty → NullNum{Num: parsed, Valid: true}.
+// Empty/whitespace-only → NullNum{Valid: false}; non-empty → NullNum{Num: parsed, Valid: true}.
 func parseNullNum(s string) num.NullNum {
+	s = strings.TrimSpace(s)
 	if s == "" {
 		return num.NullNum{}
 	}

@@ -5,18 +5,18 @@ import "github.com/trippwill/gbkr/num"
 // QueryResponse is the top-level envelope returned by the Flex Web Service
 // GetStatement endpoint for a successfully generated report.
 type QueryResponse struct {
-	QueryName  string
-	Type       string
-	Statements []Statement
+	QueryName  string      // Name of the Flex Query template that generated this report
+	Type       string      // Report type code (e.g., "AF" for Activity Flex)
+	Statements []Statement // One statement per account included in the query
 }
 
 // Statement contains the report data for a single account.
 type Statement struct {
-	AccountID     string
-	FromDate      string
-	ToDate        string
-	Period        string
-	WhenGenerated string
+	AccountID     string // IBKR account identifier (e.g., "U1234567")
+	FromDate      string // Report start date
+	ToDate        string // Report end date
+	Period        string // Report period label (e.g., "YTD", "Q1", "LastMonth")
+	WhenGenerated string // Timestamp when the report was generated
 
 	Trades            []Trade
 	CashTransactions  []CashTransaction
