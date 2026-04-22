@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/trippwill/gbkr/num"
 )
 
 func TestTrades_Recent(t *testing.T) {
@@ -72,11 +74,11 @@ func TestTradeExecution_UnmarshalJSON(t *testing.T) {
 	if te.TradeTimeEpoch != 1702317649000 {
 		t.Errorf("TradeTimeEpoch = %d", te.TradeTimeEpoch)
 	}
-	if te.Size != 100 {
-		t.Errorf("Size = %f", te.Size)
+	if !te.Size.Equal(num.FromFloat64(100)) {
+		t.Errorf("Size = %s", te.Size)
 	}
-	if te.NetAmount != -17550.0 {
-		t.Errorf("NetAmount = %f", te.NetAmount)
+	if !te.NetAmount.Equal(num.FromFloat64(-17550.0)) {
+		t.Errorf("NetAmount = %s", te.NetAmount)
 	}
 	if te.Account != "U1234567" {
 		t.Errorf("Account = %q", te.Account)

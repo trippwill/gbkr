@@ -9,6 +9,7 @@ import (
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
+	"github.com/trippwill/gbkr/num"
 )
 
 // Trades provides read access to recent trade executions (brokerage session required).
@@ -55,7 +56,7 @@ type TradeExecution struct {
 	// TradeTimeEpoch is the epoch millisecond timestamp of the trade.
 	TradeTimeEpoch int64
 	// Size is the quantity traded.
-	Size float64
+	Size num.Num
 	// Price is the execution price.
 	Price string
 	// OrderRef is the user-defined order reference.
@@ -65,7 +66,7 @@ type TradeExecution struct {
 	// Commission is the trade commission.
 	Commission string
 	// NetAmount is the total net cost of the trade.
-	NetAmount float64
+	NetAmount num.Num
 	// Account is the account identifier.
 	Account gbkr.AccountID
 	// CompanyName is the long company name.
@@ -81,25 +82,28 @@ type TradeExecution struct {
 }
 
 func (t *TradeExecution) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		ExecutionID      *string  `json:"execution_id,omitempty"`
-		Symbol           *string  `json:"symbol,omitempty"`
-		Side             *string  `json:"side,omitempty"`
-		OrderDescription *string  `json:"order_description,omitempty"`
-		TradeTime        *string  `json:"trade_time,omitempty"`
-		TradeTimeEpoch   *int64   `json:"trade_time_r,omitempty"`
-		Size             *float64 `json:"size,omitempty"`
-		Price            *string  `json:"price,omitempty"`
-		OrderRef         *string  `json:"order_ref,omitempty"`
-		Exchange         *string  `json:"exchange,omitempty"`
-		Commission       *string  `json:"commission,omitempty"`
-		NetAmount        *float64 `json:"net_amount,omitempty"`
-		Account          *string  `json:"account,omitempty"`
-		CompanyName      *string  `json:"company_name,omitempty"`
-		ContractDesc     *string  `json:"contract_description_1,omitempty"`
-		SecType          *string  `json:"sec_type,omitempty"`
-		ListingExchange  *string  `json:"listing_exchange,omitempty"`
-		ConID            *int     `json:"conid,omitempty"`
+	raw := struct {
+		ExecutionID      *string `json:"execution_id,omitempty"`
+		Symbol           *string `json:"symbol,omitempty"`
+		Side             *string `json:"side,omitempty"`
+		OrderDescription *string `json:"order_description,omitempty"`
+		TradeTime        *string `json:"trade_time,omitempty"`
+		TradeTimeEpoch   *int64  `json:"trade_time_r,omitempty"`
+		Size             num.Num `json:"size"`
+		Price            *string `json:"price,omitempty"`
+		OrderRef         *string `json:"order_ref,omitempty"`
+		Exchange         *string `json:"exchange,omitempty"`
+		Commission       *string `json:"commission,omitempty"`
+		NetAmount        num.Num `json:"net_amount"`
+		Account          *string `json:"account,omitempty"`
+		CompanyName      *string `json:"company_name,omitempty"`
+		ContractDesc     *string `json:"contract_description_1,omitempty"`
+		SecType          *string `json:"sec_type,omitempty"`
+		ListingExchange  *string `json:"listing_exchange,omitempty"`
+		ConID            *int    `json:"conid,omitempty"`
+	}{
+		Size:      num.Zero(),
+		NetAmount: num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -110,12 +114,12 @@ func (t *TradeExecution) UnmarshalJSON(data []byte) error {
 	t.OrderDescription = jx.Deref(raw.OrderDescription)
 	t.TradeTime = jx.Deref(raw.TradeTime)
 	t.TradeTimeEpoch = jx.Deref(raw.TradeTimeEpoch)
-	t.Size = jx.Deref(raw.Size)
+	t.Size = raw.Size
 	t.Price = jx.Deref(raw.Price)
 	t.OrderRef = jx.Deref(raw.OrderRef)
 	t.Exchange = gbkr.Exchange(jx.Deref(raw.Exchange))
 	t.Commission = jx.Deref(raw.Commission)
-	t.NetAmount = jx.Deref(raw.NetAmount)
+	t.NetAmount = raw.NetAmount
 	t.Account = gbkr.AccountID(jx.Deref(raw.Account))
 	t.CompanyName = jx.Deref(raw.CompanyName)
 	t.ContractDesc = jx.Deref(raw.ContractDesc)

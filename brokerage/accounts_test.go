@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/trippwill/gbkr"
+	"github.com/trippwill/gbkr/num"
 )
 
 func TestAccounts_List(t *testing.T) {
@@ -56,8 +57,8 @@ func TestAccounts_PnL(t *testing.T) {
 	if !ok {
 		t.Fatal("missing account in PnL")
 	}
-	if entry.DailyPnL != 100.5 {
-		t.Errorf("DailyPnL = %f, want 100.5", entry.DailyPnL)
+	if !entry.DailyPnL.Equal(num.FromFloat64(100.5)) {
+		t.Errorf("DailyPnL = %s, want 100.5", entry.DailyPnL)
 	}
 }
 
@@ -196,8 +197,8 @@ func TestSummaryField_UnmarshalJSON(t *testing.T) {
 	if err := json.Unmarshal(data, &sf); err != nil {
 		t.Fatal(err)
 	}
-	if sf.Amount != 50000.0 {
-		t.Errorf("Amount = %f", sf.Amount)
+	if !sf.Amount.Equal(num.FromFloat64(50000.0)) {
+		t.Errorf("Amount = %s", sf.Amount)
 	}
 	if sf.Currency != "USD" {
 		t.Errorf("Currency = %q", sf.Currency)
@@ -213,14 +214,14 @@ func TestPnLEntry_UnmarshalJSON(t *testing.T) {
 	if err := json.Unmarshal(data, &e); err != nil {
 		t.Fatal(err)
 	}
-	if e.DailyPnL != 100.5 {
-		t.Errorf("DailyPnL = %f", e.DailyPnL)
+	if !e.DailyPnL.Equal(num.FromFloat64(100.5)) {
+		t.Errorf("DailyPnL = %s", e.DailyPnL)
 	}
-	if e.NetLiquidation != 50000.0 {
-		t.Errorf("NetLiquidation = %f", e.NetLiquidation)
+	if !e.NetLiquidation.Equal(num.FromFloat64(50000.0)) {
+		t.Errorf("NetLiquidation = %s", e.NetLiquidation)
 	}
-	if e.MarginValue != 75000 {
-		t.Errorf("MarginValue = %f", e.MarginValue)
+	if !e.MarginValue.Equal(num.FromFloat64(75000)) {
+		t.Errorf("MarginValue = %s", e.MarginValue)
 	}
 }
 

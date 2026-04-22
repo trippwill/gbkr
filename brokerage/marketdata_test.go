@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/trippwill/gbkr"
+	"github.com/trippwill/gbkr/num"
 )
 
 func TestMarketData_Snapshot(t *testing.T) {
@@ -50,9 +51,9 @@ func TestMarketData_Snapshot(t *testing.T) {
 	if result[0].ServerID != "srv1" {
 		t.Errorf("ServerID = %q", result[0].ServerID)
 	}
-	last := result[0].Get(FieldLast).Float64()
-	if last != 175.50 {
-		t.Errorf("FieldLast = %f, want 175.50", last)
+	last := result[0].Get(FieldLast).Num()
+	if !last.Equal(num.FromFloat64(175.50)) {
+		t.Errorf("FieldLast = %s, want 175.50", last)
 	}
 }
 
@@ -102,11 +103,11 @@ func TestMarketData_History(t *testing.T) {
 		t.Fatalf("got %d bars, want 1", len(result.Bars))
 	}
 	bar := result.Bars[0]
-	if bar.Open != 170.0 {
-		t.Errorf("Open = %f", bar.Open)
+	if !bar.Open.Equal(num.FromFloat64(170.0)) {
+		t.Errorf("Open = %s", bar.Open)
 	}
-	if bar.Close != 175.5 {
-		t.Errorf("Close = %f", bar.Close)
+	if !bar.Close.Equal(num.FromFloat64(175.5)) {
+		t.Errorf("Close = %s", bar.Close)
 	}
 }
 
@@ -199,13 +200,13 @@ func TestSnapshot_UnmarshalJSON(t *testing.T) {
 		t.Errorf("UpdateTime = %d", s.UpdateTime)
 	}
 
-	last := s.Get(FieldLast).Float64()
-	if last != 175.50 {
-		t.Errorf("FieldLast = %f", last)
+	last := s.Get(FieldLast).Num()
+	if !last.Equal(num.FromFloat64(175.50)) {
+		t.Errorf("FieldLast = %s", last)
 	}
-	bid := s.Get(FieldBid).Float64()
-	if bid != 170.25 {
-		t.Errorf("FieldBid = %f", bid)
+	bid := s.Get(FieldBid).Num()
+	if !bid.Equal(num.FromFloat64(170.25)) {
+		t.Errorf("FieldBid = %s", bid)
 	}
 	sym := s.Get(FieldSymbol).String()
 	if sym != "AAPL" {
@@ -255,8 +256,8 @@ func TestSnapshot_AsQuote(t *testing.T) {
 	if q.Last != "175.5" {
 		t.Errorf("Last = %v", q.Last)
 	}
-	if q.ChangePct != 1.45 {
-		t.Errorf("ChangePct = %f", q.ChangePct)
+	if !q.ChangePct.Equal(num.FromFloat64(1.45)) {
+		t.Errorf("ChangePct = %s", q.ChangePct)
 	}
 }
 
@@ -284,11 +285,11 @@ func TestSnapshot_AsGreeks(t *testing.T) {
 	if !ok {
 		t.Error("expected ok=true")
 	}
-	if g.Delta != 0.65 {
-		t.Errorf("Delta = %f", g.Delta)
+	if !g.Delta.Equal(num.FromFloat64(0.65)) {
+		t.Errorf("Delta = %s", g.Delta)
 	}
-	if g.Theta != -0.05 {
-		t.Errorf("Theta = %f", g.Theta)
+	if !g.Theta.Equal(num.FromFloat64(-0.05)) {
+		t.Errorf("Theta = %s", g.Theta)
 	}
 }
 
@@ -305,8 +306,8 @@ func TestSnapshot_AsPnL(t *testing.T) {
 	if !ok {
 		t.Error("expected ok=true")
 	}
-	if p.MarketValue != 50000 {
-		t.Errorf("MarketValue = %f", p.MarketValue)
+	if !p.MarketValue.Equal(num.FromFloat64(50000)) {
+		t.Errorf("MarketValue = %s", p.MarketValue)
 	}
 }
 
@@ -324,8 +325,8 @@ func TestSnapshot_AsBond(t *testing.T) {
 	if !ok {
 		t.Error("expected ok=true")
 	}
-	if b.LastYield != 4.5 {
-		t.Errorf("LastYield = %f", b.LastYield)
+	if !b.LastYield.Equal(num.FromFloat64(4.5)) {
+		t.Errorf("LastYield = %s", b.LastYield)
 	}
 	if b.Ratings != "AAA" {
 		t.Errorf("Ratings = %q", b.Ratings)
@@ -355,11 +356,11 @@ func TestHistoryResponse_UnmarshalJSON(t *testing.T) {
 		t.Fatalf("Bars = %d", len(hr.Bars))
 	}
 	bar := hr.Bars[0]
-	if bar.Open != 170.0 || bar.Close != 175.5 {
-		t.Errorf("bar = %+v", bar)
+	if !bar.Open.Equal(num.FromFloat64(170.0)) || !bar.Close.Equal(num.FromFloat64(175.5)) {
+		t.Errorf("bar = Open:%s Close:%s", bar.Open, bar.Close)
 	}
-	if bar.Volume != 1000000 {
-		t.Errorf("Volume = %f", bar.Volume)
+	if !bar.Volume.Equal(num.FromFloat64(1000000)) {
+		t.Errorf("Volume = %s", bar.Volume)
 	}
 	if bar.Time != 1700000000 {
 		t.Errorf("Time = %d", bar.Time)

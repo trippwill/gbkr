@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/trippwill/gbkr/internal/jx"
+	"github.com/trippwill/gbkr/num"
 )
 
 // Position represents a single portfolio position returned by
@@ -22,19 +22,19 @@ type Position struct {
 	// ContractDesc is the local symbol / contract description.
 	ContractDesc string
 	// Qty is the total size of the position. (API: "position")
-	Qty float64
+	Qty num.Num
 	// MktPrice is the current market price per share.
-	MktPrice float64
+	MktPrice num.Num
 	// MktValue is the total market value of the position.
-	MktValue float64
+	MktValue num.Num
 	// AvgCost is the average cost per share multiplied by the contract multiplier.
-	AvgCost float64
+	AvgCost num.Num
 	// AvgPrice is the average purchase price per share.
-	AvgPrice float64
+	AvgPrice num.Num
 	// RealizedPnL is the realized profit/loss.
-	RealizedPnL float64
+	RealizedPnL num.Num
 	// UnrealizedPnL is the unrealized profit/loss.
-	UnrealizedPnL float64
+	UnrealizedPnL num.Num
 	// Currency is the traded currency.
 	Currency Currency
 	// AssetClass is the security type (STK, OPT, etc.).
@@ -45,34 +45,43 @@ type Position struct {
 	Expiry string
 	// PutOrCall indicates "P" (put) or "C" (call) for options. Empty for non-options.
 	PutOrCall string
-	// Strike is the option strike price. Zero for non-options.
-	Strike float64
+	// Strike is the option strike price. Absent for non-options.
+	Strike num.NullNum
 	// UndConID is the underlying contract ID for derivatives. Zero for stocks.
 	UndConID ConID
 	// Multiplier is the contract multiplier (e.g., 100 for equity options).
-	Multiplier float64
+	Multiplier num.Num
 }
 
 func (p *Position) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		AcctID        *string          `json:"acctId,omitempty"`
-		ConID         *int             `json:"conid,omitempty"`
-		ContractDesc  *string          `json:"contractDesc,omitempty"`
-		Position      *float64         `json:"position,omitempty"`
-		MktPrice      *float64         `json:"mktPrice,omitempty"`
-		MktValue      *float64         `json:"mktValue,omitempty"`
-		AvgCost       *float64         `json:"avgCost,omitempty"`
-		AvgPrice      *float64         `json:"avgPrice,omitempty"`
-		RealizedPnL   *float64         `json:"realizedPnl,omitempty"`
-		UnrealizedPnL *float64         `json:"unrealizedPnl,omitempty"`
-		Currency      *string          `json:"currency,omitempty"`
-		AssetClass    *string          `json:"assetClass,omitempty"`
-		Ticker        *string          `json:"ticker,omitempty"`
-		Expiry        *string          `json:"expiry,omitempty"`
-		PutOrCall     *string          `json:"putOrCall,omitempty"`
-		Strike        *json.RawMessage `json:"strike,omitempty"`
-		UndConID      *int             `json:"undConid,omitempty"`
-		Multiplier    *json.RawMessage `json:"multiplier,omitempty"`
+	raw := struct {
+		AcctID        *string     `json:"acctId,omitempty"`
+		ConID         *int        `json:"conid,omitempty"`
+		ContractDesc  *string     `json:"contractDesc,omitempty"`
+		Position      num.Num     `json:"position"`
+		MktPrice      num.Num     `json:"mktPrice"`
+		MktValue      num.Num     `json:"mktValue"`
+		AvgCost       num.Num     `json:"avgCost"`
+		AvgPrice      num.Num     `json:"avgPrice"`
+		RealizedPnL   num.Num     `json:"realizedPnl"`
+		UnrealizedPnL num.Num     `json:"unrealizedPnl"`
+		Currency      *string     `json:"currency,omitempty"`
+		AssetClass    *string     `json:"assetClass,omitempty"`
+		Ticker        *string     `json:"ticker,omitempty"`
+		Expiry        *string     `json:"expiry,omitempty"`
+		PutOrCall     *string     `json:"putOrCall,omitempty"`
+		Strike        num.NullNum `json:"strike"`
+		UndConID      *int        `json:"undConid,omitempty"`
+		Multiplier    num.Num     `json:"multiplier"`
+	}{
+		Position:      num.Zero(),
+		MktPrice:      num.Zero(),
+		MktValue:      num.Zero(),
+		AvgCost:       num.Zero(),
+		AvgPrice:      num.Zero(),
+		RealizedPnL:   num.Zero(),
+		UnrealizedPnL: num.Zero(),
+		Multiplier:    num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -80,52 +89,22 @@ func (p *Position) UnmarshalJSON(data []byte) error {
 	p.AcctID = AccountID(jx.Deref(raw.AcctID))
 	p.ConID = ConID(jx.Deref(raw.ConID))
 	p.ContractDesc = jx.Deref(raw.ContractDesc)
-	p.Qty = jx.Deref(raw.Position)
-	p.MktPrice = jx.Deref(raw.MktPrice)
-	p.MktValue = jx.Deref(raw.MktValue)
-	p.AvgCost = jx.Deref(raw.AvgCost)
-	p.AvgPrice = jx.Deref(raw.AvgPrice)
-	p.RealizedPnL = jx.Deref(raw.RealizedPnL)
-	p.UnrealizedPnL = jx.Deref(raw.UnrealizedPnL)
+	p.Qty = raw.Position
+	p.MktPrice = raw.MktPrice
+	p.MktValue = raw.MktValue
+	p.AvgCost = raw.AvgCost
+	p.AvgPrice = raw.AvgPrice
+	p.RealizedPnL = raw.RealizedPnL
+	p.UnrealizedPnL = raw.UnrealizedPnL
 	p.Currency = Currency(jx.Deref(raw.Currency))
 	p.AssetClass = AssetClass(jx.Deref(raw.AssetClass))
 	p.Ticker = jx.Deref(raw.Ticker)
 	p.Expiry = jx.Deref(raw.Expiry)
 	p.PutOrCall = jx.Deref(raw.PutOrCall)
-	strike, err := decodeFlexibleFloat(raw.Strike)
-	if err != nil {
-		return err
-	}
-	p.Strike = strike
+	p.Strike = raw.Strike
 	p.UndConID = ConID(jx.Deref(raw.UndConID))
-	multiplier, err := decodeFlexibleFloat(raw.Multiplier)
-	if err != nil {
-		return err
-	}
-	p.Multiplier = multiplier
+	p.Multiplier = raw.Multiplier
 	return nil
-}
-
-func decodeFlexibleFloat(raw *json.RawMessage) (float64, error) {
-	if raw == nil || len(*raw) == 0 {
-		return 0, nil
-	}
-	var f float64
-	if err := json.Unmarshal(*raw, &f); err == nil {
-		return f, nil
-	}
-	var s string
-	if err := json.Unmarshal(*raw, &s); err == nil {
-		if s == "" {
-			return 0, nil
-		}
-		parsed, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			return 0, err
-		}
-		return parsed, nil
-	}
-	return 0, fmt.Errorf("decode flexible float: unsupported JSON value %s", string(*raw))
 }
 
 // PortfolioSummary is the response for GET /portfolio/{accountId}/summary.
@@ -135,7 +114,7 @@ type PortfolioSummary map[string]PortfolioSummaryField
 // PortfolioSummaryField represents a single field within a portfolio summary.
 type PortfolioSummaryField struct {
 	// Amount is the numeric amount of the field.
-	Amount float64
+	Amount num.Num
 	// Currency is the currency code for the field value.
 	Currency Currency
 	// IsNull indicates whether the field value is null.
@@ -149,18 +128,20 @@ type PortfolioSummaryField struct {
 }
 
 func (f *PortfolioSummaryField) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Amount    *float64 `json:"amount,omitempty"`
-		Currency  *string  `json:"currency,omitempty"`
-		IsNull    *bool    `json:"isNull,omitempty"`
-		Severity  *int     `json:"severity,omitempty"`
-		Timestamp *int64   `json:"timestamp,omitempty"`
-		Value     *string  `json:"value,omitempty"`
+	raw := struct {
+		Amount    num.Num `json:"amount"`
+		Currency  *string `json:"currency,omitempty"`
+		IsNull    *bool   `json:"isNull,omitempty"`
+		Severity  *int    `json:"severity,omitempty"`
+		Timestamp *int64  `json:"timestamp,omitempty"`
+		Value     *string `json:"value,omitempty"`
+	}{
+		Amount: num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	f.Amount = jx.Deref(raw.Amount)
+	f.Amount = raw.Amount
 	f.Currency = Currency(jx.Deref(raw.Currency))
 	f.IsNull = jx.Deref(raw.IsNull)
 	f.Severity = jx.Deref(raw.Severity)
@@ -176,25 +157,25 @@ type Ledger map[Currency]LedgerEntry
 // LedgerEntry holds ledger data for a single currency.
 type LedgerEntry struct {
 	// CommodityMarketValue is the market value of commodity positions.
-	CommodityMarketValue float64
+	CommodityMarketValue num.Num
 	// FutureOptionValue is the market value of futures options positions.
-	FutureOptionValue float64
+	FutureOptionValue num.Num
 	// FuturesPnL is the PnL of futures positions. (API: "futuresonlypnl")
-	FuturesPnL float64
+	FuturesPnL num.Num
 	// Interest is the receivable interest balance.
-	Interest float64
+	Interest num.Num
 	// NetLiquidation is the net liquidation value of positions. (API: "netliquidationvalue")
-	NetLiquidation float64
+	NetLiquidation num.Num
 	// RealizedPnL is the realized PnL.
-	RealizedPnL float64
+	RealizedPnL num.Num
 	// SettledCash is the settled cash balance.
-	SettledCash float64
+	SettledCash num.Num
 	// StockMarketValue is the market value of stock positions.
-	StockMarketValue float64
+	StockMarketValue num.Num
 	// TotalCashValue is the total cash value.
-	TotalCashValue float64
+	TotalCashValue num.Num
 	// UnrealizedPnL is the unrealized PnL.
-	UnrealizedPnL float64
+	UnrealizedPnL num.Num
 	// Currency is the three-letter currency code.
 	Currency Currency
 	// Key is always "LedgerList".
@@ -202,33 +183,44 @@ type LedgerEntry struct {
 }
 
 func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		CommodityMarketValue *float64 `json:"commoditymarketvalue,omitempty"`
-		FutureOptionValue    *float64 `json:"futureoptionmarketvalue,omitempty"`
-		FuturesPnL           *float64 `json:"futuresonlypnl,omitempty"`
-		Interest             *float64 `json:"interest,omitempty"`
-		NetLiquidation       *float64 `json:"netliquidationvalue,omitempty"`
-		RealizedPnL          *float64 `json:"realizedpnl,omitempty"`
-		SettledCash          *float64 `json:"settledcash,omitempty"`
-		StockMarketValue     *float64 `json:"stockmarketvalue,omitempty"`
-		TotalCashValue       *float64 `json:"totalcashvalue,omitempty"`
-		UnrealizedPnL        *float64 `json:"unrealizedpnl,omitempty"`
-		Currency             *string  `json:"currency,omitempty"`
-		Key                  *string  `json:"key,omitempty"`
+	raw := struct {
+		CommodityMarketValue num.Num `json:"commoditymarketvalue"`
+		FutureOptionValue    num.Num `json:"futureoptionmarketvalue"`
+		FuturesPnL           num.Num `json:"futuresonlypnl"`
+		Interest             num.Num `json:"interest"`
+		NetLiquidation       num.Num `json:"netliquidationvalue"`
+		RealizedPnL          num.Num `json:"realizedpnl"`
+		SettledCash          num.Num `json:"settledcash"`
+		StockMarketValue     num.Num `json:"stockmarketvalue"`
+		TotalCashValue       num.Num `json:"totalcashvalue"`
+		UnrealizedPnL        num.Num `json:"unrealizedpnl"`
+		Currency             *string `json:"currency,omitempty"`
+		Key                  *string `json:"key,omitempty"`
+	}{
+		CommodityMarketValue: num.Zero(),
+		FutureOptionValue:    num.Zero(),
+		FuturesPnL:           num.Zero(),
+		Interest:             num.Zero(),
+		NetLiquidation:       num.Zero(),
+		RealizedPnL:          num.Zero(),
+		SettledCash:          num.Zero(),
+		StockMarketValue:     num.Zero(),
+		TotalCashValue:       num.Zero(),
+		UnrealizedPnL:        num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	e.CommodityMarketValue = jx.Deref(raw.CommodityMarketValue)
-	e.FutureOptionValue = jx.Deref(raw.FutureOptionValue)
-	e.FuturesPnL = jx.Deref(raw.FuturesPnL)
-	e.Interest = jx.Deref(raw.Interest)
-	e.NetLiquidation = jx.Deref(raw.NetLiquidation)
-	e.RealizedPnL = jx.Deref(raw.RealizedPnL)
-	e.SettledCash = jx.Deref(raw.SettledCash)
-	e.StockMarketValue = jx.Deref(raw.StockMarketValue)
-	e.TotalCashValue = jx.Deref(raw.TotalCashValue)
-	e.UnrealizedPnL = jx.Deref(raw.UnrealizedPnL)
+	e.CommodityMarketValue = raw.CommodityMarketValue
+	e.FutureOptionValue = raw.FutureOptionValue
+	e.FuturesPnL = raw.FuturesPnL
+	e.Interest = raw.Interest
+	e.NetLiquidation = raw.NetLiquidation
+	e.RealizedPnL = raw.RealizedPnL
+	e.SettledCash = raw.SettledCash
+	e.StockMarketValue = raw.StockMarketValue
+	e.TotalCashValue = raw.TotalCashValue
+	e.UnrealizedPnL = raw.UnrealizedPnL
 	e.Currency = Currency(jx.Deref(raw.Currency))
 	e.Key = jx.Deref(raw.Key)
 	return nil
@@ -321,16 +313,16 @@ type Allocation struct {
 
 // AllocationEntry holds the long and short values for an allocation bucket.
 type AllocationEntry struct {
-	Long  float64
-	Short float64
+	Long  num.Num
+	Short num.Num
 }
 
 // UnmarshalJSON implements [json.Unmarshaler].
 func (a *Allocation) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		AssetClass map[string]map[string]float64 `json:"assetClass"`
-		Sector     map[string]map[string]float64 `json:"sector"`
-		Group      map[string]map[string]float64 `json:"group"`
+		AssetClass map[string]map[string]num.Num `json:"assetClass"`
+		Sector     map[string]map[string]num.Num `json:"sector"`
+		Group      map[string]map[string]num.Num `json:"group"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -341,16 +333,20 @@ func (a *Allocation) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func decodeAllocationMap[K ~string](m map[string]map[string]float64) map[K]AllocationEntry {
+func decodeAllocationMap[K ~string](m map[string]map[string]num.Num) map[K]AllocationEntry {
 	if len(m) == 0 {
 		return nil
 	}
 	result := make(map[K]AllocationEntry, len(m))
 	for k, v := range m {
-		result[K(k)] = AllocationEntry{
-			Long:  v["long"],
-			Short: v["short"],
+		entry := AllocationEntry{Long: num.Zero(), Short: num.Zero()}
+		if n, ok := v["long"]; ok {
+			entry.Long = n
 		}
+		if n, ok := v["short"]; ok {
+			entry.Short = n
+		}
+		result[K(k)] = entry
 	}
 	return result
 }

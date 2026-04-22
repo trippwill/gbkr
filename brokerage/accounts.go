@@ -10,6 +10,7 @@ import (
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
+	"github.com/trippwill/gbkr/num"
 )
 
 // Accounts provides discovery of IBKR accounts without scoping to a specific one.
@@ -166,7 +167,7 @@ func (s *AccountSummary) UnmarshalJSON(data []byte) error {
 
 // SummaryField represents a single field within an account summary section.
 type SummaryField struct {
-	Amount    float64       // Numeric amount.
+	Amount    num.Num       // Numeric amount.
 	Currency  gbkr.Currency // Currency code.
 	IsNull    bool          // Whether the value is null.
 	Severity  int           // Severity level.
@@ -175,18 +176,20 @@ type SummaryField struct {
 }
 
 func (f *SummaryField) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Amount    *float64 `json:"amount,omitempty"`
-		Currency  *string  `json:"currency,omitempty"`
-		IsNull    *bool    `json:"isNull,omitempty"`
-		Severity  *int     `json:"severity,omitempty"`
-		Timestamp *int64   `json:"timestamp,omitempty"`
-		Value     *string  `json:"value,omitempty"`
+	raw := struct {
+		Amount    num.Num `json:"amount"`
+		Currency  *string `json:"currency,omitempty"`
+		IsNull    *bool   `json:"isNull,omitempty"`
+		Severity  *int    `json:"severity,omitempty"`
+		Timestamp *int64  `json:"timestamp,omitempty"`
+		Value     *string `json:"value,omitempty"`
+	}{
+		Amount: num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	f.Amount = jx.Deref(raw.Amount)
+	f.Amount = raw.Amount
 	f.Currency = gbkr.Currency(jx.Deref(raw.Currency))
 	f.IsNull = jx.Deref(raw.IsNull)
 	f.Severity = jx.Deref(raw.Severity)
@@ -205,31 +208,38 @@ type PnLPartitioned struct {
 // Response for GET /iserver/account/pnl/partitioned (within the acctPnl map).
 // Several fields use abbreviated API names; friendly Go names are provided.
 type PnLEntry struct {
-	DailyPnL        float64 // API: "dpl" — daily profit/loss.
-	NetLiquidation  float64 // API: "nl" — net liquidity value.
-	UnrealizedPnL   float64 // API: "upl" — unrealized profit/loss.
-	RealizedPnL     float64 // API: "rpl" — realized profit/loss.
-	ExcessLiquidity float64 // API: "el" — excess liquidity.
-	MarginValue     float64 // API: "mv" — margin value.
+	DailyPnL        num.Num // API: "dpl" — daily profit/loss.
+	NetLiquidation  num.Num // API: "nl" — net liquidity value.
+	UnrealizedPnL   num.Num // API: "upl" — unrealized profit/loss.
+	RealizedPnL     num.Num // API: "rpl" — realized profit/loss.
+	ExcessLiquidity num.Num // API: "el" — excess liquidity.
+	MarginValue     num.Num // API: "mv" — margin value.
 }
 
 func (e *PnLEntry) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		DailyPnL        *float64 `json:"dpl,omitempty"`
-		NetLiquidation  *float64 `json:"nl,omitempty"`
-		UnrealizedPnL   *float64 `json:"upl,omitempty"`
-		RealizedPnL     *float64 `json:"rpl,omitempty"`
-		ExcessLiquidity *float64 `json:"el,omitempty"`
-		MarginValue     *float64 `json:"mv,omitempty"`
+	raw := struct {
+		DailyPnL        num.Num `json:"dpl"`
+		NetLiquidation  num.Num `json:"nl"`
+		UnrealizedPnL   num.Num `json:"upl"`
+		RealizedPnL     num.Num `json:"rpl"`
+		ExcessLiquidity num.Num `json:"el"`
+		MarginValue     num.Num `json:"mv"`
+	}{
+		DailyPnL:        num.Zero(),
+		NetLiquidation:  num.Zero(),
+		UnrealizedPnL:   num.Zero(),
+		RealizedPnL:     num.Zero(),
+		ExcessLiquidity: num.Zero(),
+		MarginValue:     num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	e.DailyPnL = jx.Deref(raw.DailyPnL)
-	e.NetLiquidation = jx.Deref(raw.NetLiquidation)
-	e.UnrealizedPnL = jx.Deref(raw.UnrealizedPnL)
-	e.RealizedPnL = jx.Deref(raw.RealizedPnL)
-	e.ExcessLiquidity = jx.Deref(raw.ExcessLiquidity)
-	e.MarginValue = jx.Deref(raw.MarginValue)
+	e.DailyPnL = raw.DailyPnL
+	e.NetLiquidation = raw.NetLiquidation
+	e.UnrealizedPnL = raw.UnrealizedPnL
+	e.RealizedPnL = raw.RealizedPnL
+	e.ExcessLiquidity = raw.ExcessLiquidity
+	e.MarginValue = raw.MarginValue
 	return nil
 }
