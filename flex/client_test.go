@@ -3,6 +3,7 @@ package flex
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -492,5 +493,283 @@ func TestIsRetryable(t *testing.T) {
 				t.Errorf("IsRetryable(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWithHTTPClient(t *testing.T) {
+	custom := &http.Client{Timeout: 42 * time.Second}
+	c := NewClient(WithHTTPClient(custom))
+	if c.httpClient != custom {
+		t.Error("WithHTTPClient did not set the HTTP client")
+	}
+}
+
+func TestWithLogger(t *testing.T) {
+	l := slog.Default().With("test", true)
+	c := NewClient(WithLogger(l))
+	if c.logger != l {
+		t.Error("WithLogger did not set the logger")
+	}
+}
+
+func TestWithMaxResponseBytes_ZeroKeepsDefault(t *testing.T) {
+	c := NewClient(WithMaxResponseBytes(0))
+	if c.maxResponseBytes != defaultMaxResponseBytes {
+		t.Errorf("maxResponseBytes = %d, want default %d", c.maxResponseBytes, defaultMaxResponseBytes)
+	}
+	c2 := NewClient(WithMaxResponseBytes(-1))
+	if c2.maxResponseBytes != defaultMaxResponseBytes {
+		t.Errorf("maxResponseBytes = %d, want default %d", c2.maxResponseBytes, defaultMaxResponseBytes)
+	}
+}
+
+func TestSendRequest_EmptyReferenceCode(t *testing.T) {
+	// SendRequest returns an error if the response has no reference code.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeXML(t, w, []byte(`<?xml version="1.0" encoding="UTF-8"?>`+
+			`<FlexStatementResponse><Status>Success</Status>`+
+			`<ReferenceCode></ReferenceCode>`+
+			`<Url></Url>`+
+			`<ErrorCode>0</ErrorCode>`+
+			`<ErrorMessage></ErrorMessage>`+
+			`</FlexStatementResponse>`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err := c.SendRequest(context.Background(), "TOKEN", "QUERYID")
+	if err == nil {
+		t.Fatal("expected error for empty reference code")
+	}
+	if !strings.Contains(err.Error(), "empty reference code") {
+		t.Errorf("error = %v, want mention of empty reference code", err)
+	}
+}
+
+func TestGetStatement_EmptyBody(t *testing.T) {
+	// An empty response body from IBKR means the report is still being generated.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err := c.GetStatement(context.Background(), "TOKEN", "REF123")
+	if !errors.Is(err, ErrReportNotReady) {
+		t.Fatalf("error = %v, want ErrReportNotReady", err)
+	}
+}
+
+func TestGetStatement_UnparseableBody(t *testing.T) {
+	// A body that is neither a valid report, error response, nor CSV should
+	// still return an error (with the body saved for debugging if reportDir set).
+	body := []byte(`<html><body>Gateway timeout</body></html>`)
+	dir := t.TempDir()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		if _, err := w.Write(body); err != nil {
+			t.Fatalf("write response: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL+"/"), WithReportDir(dir))
+	_, err := c.GetStatement(context.Background(), "TOKEN", "BADREF")
+	if err == nil {
+		t.Fatal("expected error for unparseable body")
+	}
+
+	// Verify the body was saved for inspection.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("saved file count = %d, want 1", len(entries))
+	}
+	if !strings.HasSuffix(entries[0].Name(), "-err.xml") {
+		t.Errorf("filename %q should end with -err.xml", entries[0].Name())
+	}
+}
+
+func TestFetchReport_RetriesExhausted(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	errorData := []byte(`<?xml version="1.0" encoding="UTF-8"?>` +
+		`<FlexStatementResponse><Status>Warn</Status>` +
+		`<ErrorCode>1019</ErrorCode>` +
+		`<ErrorMessage>Not ready</ErrorMessage>` +
+		`</FlexStatementResponse>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, errorData)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(1*time.Millisecond),
+		WithBackoffMultiplier(1.0),
+		WithMaxRetries(1),
+	)
+	if err == nil {
+		t.Fatal("expected error after retries exhausted")
+	}
+	if !errors.Is(err, ErrReportNotReady) {
+		t.Errorf("error = %v, want ErrReportNotReady", err)
+	}
+	if !strings.Contains(err.Error(), "after 1 retries") {
+		t.Errorf("error = %v, want mention of retry count", err)
+	}
+}
+
+func TestFetchReport_NonRetryableError(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Token expired is not retryable — FetchReport should fail immediately.
+	errorData := []byte(`<?xml version="1.0" encoding="UTF-8"?>` +
+		`<FlexStatementResponse><Status>Fail</Status>` +
+		`<ErrorCode>1012</ErrorCode>` +
+		`<ErrorMessage>Token has expired.</ErrorMessage>` +
+		`</FlexStatementResponse>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, errorData)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(1*time.Millisecond),
+		WithMaxRetries(3),
+	)
+	if !errors.Is(err, ErrTokenExpired) {
+		t.Fatalf("error = %v, want ErrTokenExpired", err)
+	}
+}
+
+func TestFormatHTTPError(t *testing.T) {
+	tests := []struct {
+		name      string
+		status    string
+		preview   []byte
+		truncated bool
+		want      string
+	}{
+		{
+			name:    "empty status uses default",
+			status:  "",
+			preview: []byte("oops"),
+			want:    "500 Internal Server Error",
+		},
+		{
+			name:    "empty body",
+			status:  "503 Service Unavailable",
+			preview: nil,
+			want:    "unexpected HTTP 503 Service Unavailable",
+		},
+		{
+			name:      "truncated",
+			status:    "502 Bad Gateway",
+			preview:   []byte("partial"),
+			truncated: true,
+			want:      "partial...",
+		},
+		{
+			name:    "whitespace-only body treated as empty",
+			status:  "500 Internal Server Error",
+			preview: []byte("   \n\t  "),
+			want:    "unexpected HTTP 500 Internal Server Error",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := formatHTTPError("test", 500, tt.status, tt.preview, tt.truncated)
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("formatHTTPError() = %q, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestSanitizeFilenamePart(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", "report"},
+		{"simple", "simple"},
+		{"with spaces", "with_spaces"},
+		{"../../path/traversal", "path_traversal"},
+		{"!!!###", "report"},
+		{"a--b__c", "a--b__c"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := sanitizeFilenamePart(tt.input)
+			if got != tt.want {
+				t.Errorf("sanitizeFilenamePart(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResponseError_Unwrap_UnknownCode(t *testing.T) {
+	err := ErrResponse(9999, "unknown error")
+	var rerr *ResponseError
+	if !errors.As(err, &rerr) {
+		t.Fatal("expected ResponseError")
+	}
+	if rerr.Unwrap() != nil {
+		t.Errorf("Unwrap() for unknown code should return nil, got %v", rerr.Unwrap())
+	}
+}
+
+func TestGetStatement_HTTPStatusError_EmptyBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err := c.GetStatement(context.Background(), "TOKEN", "REF123")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// Empty body on HTTP error should produce "unexpected HTTP 500..." without body preview.
+	if !strings.Contains(err.Error(), "unexpected HTTP") {
+		t.Errorf("error = %v, want HTTP status error", err)
+	}
+}
+
+func TestSendRequest_HTTPStatusError_EmptyBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err := c.SendRequest(context.Background(), "TOKEN", "QUERYID")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "unexpected HTTP") {
+		t.Errorf("error = %v, want HTTP status error", err)
 	}
 }

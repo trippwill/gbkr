@@ -640,3 +640,207 @@ func TestParseActivityStatement_InvalidNullNumField(t *testing.T) {
 		t.Errorf("expected FieldError for Strike, got: %v", fieldErrs)
 	}
 }
+
+func TestParseActivityStatement_WhitespacePaddedNumerics(t *testing.T) {
+	// IBKR Flex attributes are normally trimmed, but defensive parsing
+	// should handle incidental whitespace around numeric values.
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <Trades>
+        <Trade transactionID="T1" tradeID="T1" ibOrderID="" ibExecID="" accountId="U1" conid=" 42 " symbol="X" underlyingSymbol="" underlyingConid=" 0 " assetCategory="STK" buySell="BUY" quantity=" 100 " tradePrice=" 175.50 " tradeMoney=" 17550 " proceeds=" -17550 " ibCommission=" -1.00 " taxes=" 0 " netCash="" fifoPnlRealized="" costBasis=" 17551.00 " strike="" expiry="" putCall="" openCloseIndicator="" orderReference="" tradeDate="2026-01-01" settleDate="" currency="USD" multiplier=" 1 " />
+      </Trades>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	resp, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err != nil {
+		t.Fatalf("ParseActivityStatement: %v", err)
+	}
+
+	tr := resp.Statements[0].Trades[0]
+
+	// int64 fields with whitespace
+	if tr.ConID != 42 {
+		t.Errorf("ConID = %d, want 42", tr.ConID)
+	}
+	if tr.UnderlyingID != 0 {
+		t.Errorf("UnderlyingID = %d, want 0", tr.UnderlyingID)
+	}
+
+	// Num fields with whitespace
+	assertNum(t, "Quantity", tr.Quantity, "100")
+	assertNum(t, "Price", tr.Price, "175.50")
+	assertNum(t, "Commission", tr.Commission, "-1.00")
+	assertNum(t, "Multiplier", tr.Multiplier, "1")
+
+	// NullNum with whitespace
+	if !tr.CostBasis.Valid {
+		t.Fatal("CostBasis should be valid")
+	}
+	assertNum(t, "CostBasis.Num", tr.CostBasis.Num, "17551.00")
+
+	// Whitespace-only should behave like empty string → NullNum invalid
+	xmlData2 := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <Trades>
+        <Trade transactionID="T1" tradeID="T1" ibOrderID="" ibExecID="" accountId="U1" conid="1" symbol="X" underlyingSymbol="" underlyingConid="0" assetCategory="STK" buySell="BUY" quantity="1" tradePrice="1" tradeMoney="1" proceeds="1" ibCommission="0" taxes="0" netCash="" fifoPnlRealized="" costBasis="   " strike="" expiry="" putCall="" openCloseIndicator="" orderReference="" tradeDate="2026-01-01" settleDate="" currency="USD" multiplier="1" />
+      </Trades>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	resp2, err := ParseActivityStatement(strings.NewReader(xmlData2))
+	if err != nil {
+		t.Fatalf("ParseActivityStatement (whitespace-only NullNum): %v", err)
+	}
+
+	if resp2.Statements[0].Trades[0].CostBasis.Valid {
+		t.Errorf("CostBasis with whitespace-only value should be invalid (treated as empty)")
+	}
+}
+
+func TestParseActivityStatement_WhitespaceOnlyRequiredNum(t *testing.T) {
+	// A whitespace-only value in a required Num field (e.g., quantity="   ")
+	// should be caught by validation as a parse error.
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Q" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1" fromDate="2026-01-01" toDate="2026-01-01" period="D" whenGenerated="2026-01-01;19:30:00">
+      <Trades>
+        <Trade transactionID="T1" tradeID="T1" ibOrderID="" ibExecID="" accountId="U1" conid="1" symbol="X" underlyingSymbol="" underlyingConid="0" assetCategory="STK" buySell="BUY" quantity="   " tradePrice="1" tradeMoney="1" proceeds="1" ibCommission="0" taxes="0" netCash="" fifoPnlRealized="" costBasis="" strike="" expiry="" putCall="" openCloseIndicator="" orderReference="" tradeDate="2026-01-01" settleDate="" currency="USD" multiplier="1" />
+      </Trades>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`
+
+	_, err := ParseActivityStatement(strings.NewReader(xmlData))
+	if err == nil {
+		t.Fatal("expected error for whitespace-only required Num field")
+	}
+
+	var fieldErrs FieldErrors
+	if !errors.As(err, &fieldErrs) {
+		t.Fatalf("expected FieldErrors, got %T: %v", err, err)
+	}
+
+	foundQuantity := false
+	for _, fe := range fieldErrs {
+		if fe.Field == "Quantity" {
+			foundQuantity = true
+		}
+	}
+	if !foundQuantity {
+		t.Errorf("expected FieldError for Quantity, got: %v", fieldErrs)
+	}
+}
+
+func BenchmarkMapStatement(b *testing.B) {
+	// Build a realistic xmlStatement with 500 trades, 100 cash transactions,
+	// 50 option events, and 50 commission details.
+	ws := xmlStatement{
+		AccountID:     "U1234567",
+		FromDate:      "2026-01-01",
+		ToDate:        "2026-03-31",
+		Period:        "Q1",
+		WhenGenerated: "2026-04-01;08:00:00",
+	}
+
+	for i := range 500 {
+		ws.Trades = append(ws.Trades, xmlTrade{
+			TransactionID:      fmt.Sprintf("TXN%05d", i),
+			TradeID:            fmt.Sprintf("TRD%05d", i),
+			IBOrderID:          fmt.Sprintf("ORD%05d", i),
+			IBExecID:           fmt.Sprintf("EXE%05d", i),
+			AccountID:          "U1234567",
+			ConID:              "265598",
+			Symbol:             "AAPL",
+			UnderlyingSymbol:   "AAPL",
+			UnderlyingConID:    "265598",
+			AssetCategory:      "STK",
+			BuySell:            "BUY",
+			Quantity:           "100",
+			TradePrice:         "175.50",
+			TradeMoney:         "17550.00",
+			Proceeds:           "-17550.00",
+			IBCommission:       "-1.00",
+			Taxes:              "0",
+			NetCash:            "-17551.00",
+			FIFOPnlRealized:    "",
+			CostBasis:          "17551.00",
+			Strike:             "",
+			Expiry:             "",
+			PutCall:            "",
+			OpenCloseIndicator: "O",
+			OrderReference:     "",
+			TradeDate:          "20260115",
+			SettleDate:         "20260117",
+			Currency:           "USD",
+			Multiplier:         "1",
+		})
+	}
+
+	for i := range 100 {
+		ws.CashTxns = append(ws.CashTxns, xmlCashTransaction{
+			TransactionID: fmt.Sprintf("CTX%05d", i),
+			AccountID:     "U1234567",
+			ConID:         "265598",
+			Symbol:        "AAPL",
+			Type:          "Dividends",
+			Amount:        "25.00",
+			Currency:      "USD",
+			Description:   "AAPL(US0378331005) CASH DIVIDEND USD 0.25 PER SHARE",
+			ReportDate:    "20260201",
+			SettleDate:    "20260201",
+		})
+	}
+
+	for i := range 50 {
+		ws.OptionEvents = append(ws.OptionEvents, xmlOptionEvent{
+			TransactionType:  "Assignment",
+			AccountID:        "U1234567",
+			ConID:            fmt.Sprintf("%d", 700000+i),
+			Symbol:           "AAPL 260321C00180000",
+			UnderlyingSymbol: "AAPL",
+			UnderlyingConID:  "265598",
+			Strike:           "180",
+			Expiry:           "20260321",
+			PutCall:          "C",
+			Quantity:         "-1",
+			Proceeds:         "18000.00",
+			RealizedPnl:      "500.00",
+			TradeDate:        "20260321",
+			Currency:         "USD",
+			Multiplier:       "100",
+		})
+	}
+
+	for i := range 50 {
+		ws.Commissions = append(ws.Commissions, xmlCommissionDetail{
+			AccountID:                  "U1234567",
+			ConID:                      "265598",
+			Symbol:                     "AAPL",
+			TradeID:                    fmt.Sprintf("TRD%05d", i),
+			ExecID:                     fmt.Sprintf("EXE%05d", i),
+			BrokerExecutionCharge:      "0.50",
+			BrokerClearingCharge:       "0.20",
+			ThirdPartyExecutionCharge:  "0.10",
+			RegFINRATradingActivityFee: "0.0119",
+			RegSection31TransactionFee: "0.0027",
+			Currency:                   "USD",
+			TradeDate:                  "20260115",
+		})
+	}
+
+	b.ResetTimer()
+	for range b.N {
+		_, err := mapStatement(ws)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
