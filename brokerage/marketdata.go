@@ -92,7 +92,7 @@ func (v FieldValue) Num() num.Num {
 	if !v.Present() {
 		return num.Zero()
 	}
-	var n num.Num
+	n := num.Zero()
 	_ = n.UnmarshalJSON(v.raw)
 	return n
 }

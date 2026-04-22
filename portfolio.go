@@ -45,7 +45,7 @@ type Position struct {
 	Expiry string
 	// PutOrCall indicates "P" (put) or "C" (call) for options. Empty for non-options.
 	PutOrCall string
-	// Strike is the option strike price. Absent for non-options.
+	// Strike is the option strike price. May be null or zero for non-options.
 	Strike num.NullNum
 	// UndConID is the underlying contract ID for derivatives. Zero for stocks.
 	UndConID ConID
