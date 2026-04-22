@@ -12,6 +12,7 @@ import (
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
+	"github.com/trippwill/gbkr/num"
 )
 
 // MarketData provides read access to IBKR market data.
@@ -84,6 +85,17 @@ type FieldValue struct {
 
 // Present reports whether the field was included in the response.
 func (v FieldValue) Present() bool { return len(v.raw) > 0 }
+
+// Num returns the value as [num.Num], handling both bare numeric and
+// quoted string formats from the IBKR API. Returns [num.Zero] if absent.
+func (v FieldValue) Num() num.Num {
+	if !v.Present() {
+		return num.Zero()
+	}
+	n := num.Zero()
+	_ = n.UnmarshalJSON(v.raw)
+	return n
+}
 
 // Float64 returns the value as float64, or 0 if absent or not numeric.
 func (v FieldValue) Float64() float64 {
@@ -239,16 +251,16 @@ type Quote struct {
 	Symbol      string  // Ticker symbol.
 	CompanyName string  // Company or instrument name.
 	Last        string  // Last traded price (string; may contain formatting).
-	Bid         float64 // Current bid price.
-	Ask         float64 // Current ask price.
-	High        float64 // Day high.
-	Low         float64 // Day low.
-	Open        float64 // Day open.
-	Close       float64 // Day close.
-	PriorClose  float64 // Previous session close.
-	Volume      float64 // Day volume.
-	Change      float64 // Absolute price change.
-	ChangePct   float64 // Percentage price change.
+	Bid         num.Num // Current bid price.
+	Ask         num.Num // Current ask price.
+	High        num.Num // Day high.
+	Low         num.Num // Day low.
+	Open        num.Num // Day open.
+	Close       num.Num // Day close.
+	PriorClose  num.Num // Previous session close.
+	Volume      num.Num // Day volume.
+	Change      num.Num // Absolute price change.
+	ChangePct   num.Num // Percentage price change.
 }
 
 // AsQuote projects the snapshot into a Quote struct.
@@ -258,72 +270,72 @@ func (s Snapshot) AsQuote() (Quote, bool) {
 		Symbol:      s.Get(FieldSymbol).String(),
 		CompanyName: s.Get(FieldCompanyName).String(),
 		Last:        s.Get(FieldLast).String(),
-		Bid:         s.Get(FieldBid).Float64(),
-		Ask:         s.Get(FieldAsk).Float64(),
-		High:        s.Get(FieldHigh).Float64(),
-		Low:         s.Get(FieldLow).Float64(),
-		Open:        s.Get(FieldOpen).Float64(),
-		Close:       s.Get(FieldClose).Float64(),
-		PriorClose:  s.Get(FieldPriorClose).Float64(),
-		Volume:      s.Get(FieldVolume).Float64(),
-		Change:      s.Get(FieldChange).Float64(),
-		ChangePct:   s.Get(FieldChangePct).Float64(),
+		Bid:         s.Get(FieldBid).Num(),
+		Ask:         s.Get(FieldAsk).Num(),
+		High:        s.Get(FieldHigh).Num(),
+		Low:         s.Get(FieldLow).Num(),
+		Open:        s.Get(FieldOpen).Num(),
+		Close:       s.Get(FieldClose).Num(),
+		PriorClose:  s.Get(FieldPriorClose).Num(),
+		Volume:      s.Get(FieldVolume).Num(),
+		Change:      s.Get(FieldChange).Num(),
+		ChangePct:   s.Get(FieldChangePct).Num(),
 	}, s.hasAll(FieldsQuote)
 }
 
 // Greeks is a strongly-typed projection of a Snapshot using FieldsGreeks.
 type Greeks struct {
-	Delta      float64 // Rate of change of option price vs underlying.
-	Gamma      float64 // Rate of change of delta.
-	Theta      float64 // Time decay per day.
-	Vega       float64 // Sensitivity to implied volatility.
-	ImpliedVol float64 // Option implied volatility.
-	OptIV      float64 // Implied vol from underlying (30-day).
+	Delta      num.Num // Rate of change of option price vs underlying.
+	Gamma      num.Num // Rate of change of delta.
+	Theta      num.Num // Time decay per day.
+	Vega       num.Num // Sensitivity to implied volatility.
+	ImpliedVol num.Num // Option implied volatility.
+	OptIV      num.Num // Implied vol from underlying (30-day).
 }
 
 // AsGreeks projects the snapshot into a Greeks struct.
 // Returns ok=true if all FieldsGreeks fields are present.
 func (s Snapshot) AsGreeks() (Greeks, bool) {
 	return Greeks{
-		Delta:      s.Get(FieldDelta).Float64(),
-		Gamma:      s.Get(FieldGamma).Float64(),
-		Theta:      s.Get(FieldTheta).Float64(),
-		Vega:       s.Get(FieldVega).Float64(),
-		ImpliedVol: s.Get(FieldImpliedVol).Float64(),
-		OptIV:      s.Get(FieldOptImpliedVol).Float64(),
+		Delta:      s.Get(FieldDelta).Num(),
+		Gamma:      s.Get(FieldGamma).Num(),
+		Theta:      s.Get(FieldTheta).Num(),
+		Vega:       s.Get(FieldVega).Num(),
+		ImpliedVol: s.Get(FieldImpliedVol).Num(),
+		OptIV:      s.Get(FieldOptImpliedVol).Num(),
 	}, s.hasAll(FieldsGreeks)
 }
 
 // PnLSnapshot is a strongly-typed projection of a Snapshot using FieldsPnL.
 type PnLSnapshot struct {
-	MarketValue      float64 // Current market value of the position.
-	AvgPrice         float64 // Average entry price.
-	UnrealizedPnL    float64 // Unrealized profit/loss.
-	UnrealizedPnLPct float64 // Unrealized P&L as a percentage.
-	RealizedPnL      float64 // Realized profit/loss.
-	DailyPnL         float64 // Day profit/loss.
-	CostBasis        float64 // Total cost basis.
+	MarketValue      num.Num // Current market value of the position.
+	AvgPrice         num.Num // Average entry price.
+	UnrealizedPnL    num.Num // Unrealized profit/loss.
+	UnrealizedPnLPct num.Num // Unrealized P&L as a percentage.
+	RealizedPnL      num.Num // Realized profit/loss.
+	DailyPnL         num.Num // Day profit/loss.
+	CostBasis        num.Num // Total cost basis.
 }
 
 // AsPnL projects the snapshot into a PnLSnapshot struct.
 // Returns ok=true if all FieldsPnL fields are present.
 func (s Snapshot) AsPnL() (PnLSnapshot, bool) {
 	return PnLSnapshot{
-		MarketValue:      s.Get(FieldMarketValue).Float64(),
-		AvgPrice:         s.Get(FieldAvgPrice).Float64(),
-		UnrealizedPnL:    s.Get(FieldUnrealizedPnL).Float64(),
-		UnrealizedPnLPct: s.Get(FieldUnrealizedPnLPct).Float64(),
-		RealizedPnL:      s.Get(FieldRealizedPnL).Float64(),
-		DailyPnL:         s.Get(FieldDailyPnL).Float64(),
-		CostBasis:        s.Get(FieldCostBasis).Float64(),
+		MarketValue:      s.Get(FieldMarketValue).Num(),
+		AvgPrice:         s.Get(FieldAvgPrice).Num(),
+		UnrealizedPnL:    s.Get(FieldUnrealizedPnL).Num(),
+		UnrealizedPnLPct: s.Get(FieldUnrealizedPnLPct).Num(),
+		RealizedPnL:      s.Get(FieldRealizedPnL).Num(),
+		DailyPnL:         s.Get(FieldDailyPnL).Num(),
+		CostBasis:        s.Get(FieldCostBasis).Num(),
 	}, s.hasAll(FieldsPnL)
 }
 
 // BondSnapshot is a strongly-typed projection of a Snapshot using FieldsBond.
 type BondSnapshot struct {
-	LastYield       float64 // Last yield value.
-	BidYield        float64 // Bid yield value.
-	AskYield        float64 // Ask yield value.
+	LastYield       num.Num // Last yield value.
+	BidYield        num.Num // Bid yield value.
+	AskYield        num.Num // Ask yield value.
 	Ratings         string  // Credit ratings.
 	BondType        string  // Bond type classification.
 	DebtClass       string  // Debt class (e.g. senior, subordinated).
@@ -335,9 +347,9 @@ type BondSnapshot struct {
 // Returns ok=true if all FieldsBond fields are present.
 func (s Snapshot) AsBond() (BondSnapshot, bool) {
 	return BondSnapshot{
-		LastYield:       s.Get(FieldLastYield).Float64(),
-		BidYield:        s.Get(FieldBidYield).Float64(),
-		AskYield:        s.Get(FieldAskYield).Float64(),
+		LastYield:       s.Get(FieldLastYield).Num(),
+		BidYield:        s.Get(FieldBidYield).Num(),
+		AskYield:        s.Get(FieldAskYield).Num(),
 		Ratings:         s.Get(FieldRatings).String(),
 		BondType:        s.Get(FieldBondType).String(),
 		DebtClass:       s.Get(FieldDebtClass).String(),
@@ -381,31 +393,37 @@ func (h *HistoryResponse) UnmarshalJSON(data []byte) error {
 
 // HistoryBar represents a single OHLCV bar in a history response.
 type HistoryBar struct {
-	Open   float64 // Open price. (API: "o")
-	High   float64 // High price. (API: "h")
-	Low    float64 // Low price. (API: "l")
-	Close  float64 // Close price. (API: "c")
-	Volume float64 // Volume. (API: "v")
+	Open   num.Num // Open price. (API: "o")
+	High   num.Num // High price. (API: "h")
+	Low    num.Num // Low price. (API: "l")
+	Close  num.Num // Close price. (API: "c")
+	Volume num.Num // Volume. (API: "v")
 	Time   int64   // Epoch unix timestamp. (API: "t")
 }
 
 func (b *HistoryBar) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Open   *float64 `json:"o,omitempty"`
-		High   *float64 `json:"h,omitempty"`
-		Low    *float64 `json:"l,omitempty"`
-		Close  *float64 `json:"c,omitempty"`
-		Volume *float64 `json:"v,omitempty"`
-		Time   *int64   `json:"t,omitempty"`
+	raw := struct {
+		Open   num.Num `json:"o"`
+		High   num.Num `json:"h"`
+		Low    num.Num `json:"l"`
+		Close  num.Num `json:"c"`
+		Volume num.Num `json:"v"`
+		Time   *int64  `json:"t,omitempty"`
+	}{
+		Open:   num.Zero(),
+		High:   num.Zero(),
+		Low:    num.Zero(),
+		Close:  num.Zero(),
+		Volume: num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	b.Open = jx.Deref(raw.Open)
-	b.High = jx.Deref(raw.High)
-	b.Low = jx.Deref(raw.Low)
-	b.Close = jx.Deref(raw.Close)
-	b.Volume = jx.Deref(raw.Volume)
+	b.Open = raw.Open
+	b.High = raw.High
+	b.Low = raw.Low
+	b.Close = raw.Close
+	b.Volume = raw.Volume
 	b.Time = jx.Deref(raw.Time)
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/trippwill/gbkr/internal/jx"
+	"github.com/trippwill/gbkr/num"
 )
 
 // TransactionHistoryRequest is the request body for POST /pa/transactions.
@@ -62,15 +63,15 @@ type Transaction struct {
 	// Currency is the traded instrument currency.
 	Currency Currency
 	// FxRate is the forex conversion rate.
-	FxRate float64
+	FxRate num.Num
 	// Price is the price per share.
-	Price float64
+	Price num.Num
 	// Qty is the quantity traded (negative for sells).
 	Qty int
 	// Account is the account identifier.
 	Account AccountID
 	// Amount is the total trade value.
-	Amount float64
+	Amount num.Num
 	// ConID is the contract identifier.
 	ConID ConID
 	// Type is the order side (e.g., "Sell", "Buy").
@@ -80,28 +81,32 @@ type Transaction struct {
 }
 
 func (t *Transaction) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Date     *string  `json:"date,omitempty"`
-		Currency *string  `json:"cur,omitempty"`
-		FxRate   *float64 `json:"fxRate,omitempty"`
-		Price    *float64 `json:"pr,omitempty"`
-		Qty      *int     `json:"qty,omitempty"`
-		Account  *string  `json:"acctid,omitempty"`
-		Amount   *float64 `json:"amt,omitempty"`
-		ConID    *int     `json:"conid,omitempty"`
-		Type     *string  `json:"type,omitempty"`
-		Desc     *string  `json:"desc,omitempty"`
+	raw := struct {
+		Date     *string `json:"date,omitempty"`
+		Currency *string `json:"cur,omitempty"`
+		FxRate   num.Num `json:"fxRate"`
+		Price    num.Num `json:"pr"`
+		Qty      *int    `json:"qty,omitempty"`
+		Account  *string `json:"acctid,omitempty"`
+		Amount   num.Num `json:"amt"`
+		ConID    *int    `json:"conid,omitempty"`
+		Type     *string `json:"type,omitempty"`
+		Desc     *string `json:"desc,omitempty"`
+	}{
+		FxRate: num.Zero(),
+		Price:  num.Zero(),
+		Amount: num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 	t.Date = jx.Deref(raw.Date)
 	t.Currency = Currency(jx.Deref(raw.Currency))
-	t.FxRate = jx.Deref(raw.FxRate)
-	t.Price = jx.Deref(raw.Price)
+	t.FxRate = raw.FxRate
+	t.Price = raw.Price
 	t.Qty = jx.Deref(raw.Qty)
 	t.Account = AccountID(jx.Deref(raw.Account))
-	t.Amount = jx.Deref(raw.Amount)
+	t.Amount = raw.Amount
 	t.ConID = ConID(jx.Deref(raw.ConID))
 	t.Type = jx.Deref(raw.Type)
 	t.Desc = jx.Deref(raw.Desc)

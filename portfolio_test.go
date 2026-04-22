@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/trippwill/gbkr/num"
 )
 
 func TestPortfolio_Positions(t *testing.T) {
@@ -48,8 +50,8 @@ func TestPortfolio_Positions(t *testing.T) {
 	if positions[0].Ticker != "AAPL" {
 		t.Errorf("Ticker = %q, want %q", positions[0].Ticker, "AAPL")
 	}
-	if positions[0].Qty != 100 {
-		t.Errorf("Qty = %f, want 100", positions[0].Qty)
+	if !positions[0].Qty.Equal(num.FromFloat64(100)) {
+		t.Errorf("Qty = %s, want 100", positions[0].Qty)
 	}
 }
 
@@ -114,8 +116,8 @@ func TestPortfolio_Summary(t *testing.T) {
 	if !ok {
 		t.Fatal("missing totalcashvalue")
 	}
-	if field.Amount != 10000.0 {
-		t.Errorf("Amount = %f, want 10000", field.Amount)
+	if !field.Amount.Equal(num.FromFloat64(10000)) {
+		t.Errorf("Amount = %s, want 10000", field.Amount)
 	}
 }
 
@@ -153,8 +155,8 @@ func TestPortfolio_Ledger(t *testing.T) {
 	if !ok {
 		t.Fatal("missing USD entry")
 	}
-	if entry.NetLiquidation != 50000.0 {
-		t.Errorf("NetLiquidation = %f, want 50000", entry.NetLiquidation)
+	if !entry.NetLiquidation.Equal(num.FromFloat64(50000)) {
+		t.Errorf("NetLiquidation = %s, want 50000", entry.NetLiquidation)
 	}
 }
 
@@ -204,22 +206,22 @@ func TestPortfolio_Allocation(t *testing.T) {
 	if !ok {
 		t.Fatal("missing STK in AssetClass")
 	}
-	if stk.Long != 85000 {
-		t.Errorf("STK long = %f, want 85000", stk.Long)
+	if !stk.Long.Equal(num.FromFloat64(85000)) {
+		t.Errorf("STK long = %s, want 85000", stk.Long)
 	}
 	tech, ok := alloc.Sector["Technology"]
 	if !ok {
 		t.Fatal("missing Technology in Sector")
 	}
-	if tech.Long != 50000 {
-		t.Errorf("Technology long = %f", tech.Long)
+	if !tech.Long.Equal(num.FromFloat64(50000)) {
+		t.Errorf("Technology long = %s", tech.Long)
 	}
 	us, ok := alloc.Group["US"]
 	if !ok {
 		t.Fatal("missing US in Group")
 	}
-	if us.Short != -2000 {
-		t.Errorf("US short = %f", us.Short)
+	if !us.Short.Equal(num.FromFloat64(-2000)) {
+		t.Errorf("US short = %s", us.Short)
 	}
 }
 

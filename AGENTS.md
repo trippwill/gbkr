@@ -22,5 +22,6 @@ Additional skills: **`testing-guide`** for test conventions, **`workspace-git`**
 ## Invariants
 
 - **Green-field**: No module version declared. Prefer better design over backward compatibility.
+- **Financial types**: All financial fields use `num.Num` / `num.NullNum` — never `float64`. See ADR-014.
 - Run `mise run precommit` before commits.
 - Linting uses `golangci-lint` v2; config in `.golangci.yml`.

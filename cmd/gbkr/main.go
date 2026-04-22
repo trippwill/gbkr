@@ -82,7 +82,7 @@ func main() {
 		log.Printf("Error getting positions: %v", err)
 	} else {
 		for _, p := range pos {
-			fmt.Printf("Position: %s qty=%.0f\n", p.ContractDesc, p.Qty)
+			fmt.Printf("Position: %s qty=%s\n", p.ContractDesc, p.Qty)
 			if p.AssetClass != gbkr.AssetOption && p.ConID != 0 {
 				conIDs = append(conIDs, p.ConID)
 			}
