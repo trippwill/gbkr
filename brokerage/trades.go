@@ -55,16 +55,16 @@ type TradeExecution struct {
 	TradeTime string
 	// TradeTimeEpoch is the epoch millisecond timestamp of the trade.
 	TradeTimeEpoch int64
-	// Size is the quantity traded.
-	Size num.Num
+	// Quantity is the number of units traded.
+	Quantity num.Num
 	// Price is the execution price.
-	Price string
+	Price num.Num
 	// OrderRef is the user-defined order reference.
 	OrderRef string
 	// Exchange is the execution exchange.
 	Exchange gbkr.Exchange
 	// Commission is the trade commission.
-	Commission string
+	Commission num.Num
 	// NetAmount is the total net cost of the trade.
 	NetAmount num.Num
 	// Account is the account identifier.
@@ -89,11 +89,11 @@ func (t *TradeExecution) UnmarshalJSON(data []byte) error {
 		OrderDescription *string `json:"order_description,omitempty"`
 		TradeTime        *string `json:"trade_time,omitempty"`
 		TradeTimeEpoch   *int64  `json:"trade_time_r,omitempty"`
-		Size             num.Num `json:"size"`
-		Price            *string `json:"price,omitempty"`
+		Quantity         num.Num `json:"size"`
+		Price            num.Num `json:"price"`
 		OrderRef         *string `json:"order_ref,omitempty"`
 		Exchange         *string `json:"exchange,omitempty"`
-		Commission       *string `json:"commission,omitempty"`
+		Commission       num.Num `json:"commission"`
 		NetAmount        num.Num `json:"net_amount"`
 		Account          *string `json:"account,omitempty"`
 		CompanyName      *string `json:"company_name,omitempty"`
@@ -102,8 +102,10 @@ func (t *TradeExecution) UnmarshalJSON(data []byte) error {
 		ListingExchange  *string `json:"listing_exchange,omitempty"`
 		ConID            *int    `json:"conid,omitempty"`
 	}{
-		Size:      num.Zero(),
-		NetAmount: num.Zero(),
+		Quantity:   num.Zero(),
+		Price:      num.Zero(),
+		Commission: num.Zero(),
+		NetAmount:  num.Zero(),
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -114,11 +116,11 @@ func (t *TradeExecution) UnmarshalJSON(data []byte) error {
 	t.OrderDescription = jx.Deref(raw.OrderDescription)
 	t.TradeTime = jx.Deref(raw.TradeTime)
 	t.TradeTimeEpoch = jx.Deref(raw.TradeTimeEpoch)
-	t.Size = raw.Size
-	t.Price = jx.Deref(raw.Price)
+	t.Quantity = raw.Quantity
+	t.Price = raw.Price
 	t.OrderRef = jx.Deref(raw.OrderRef)
 	t.Exchange = gbkr.Exchange(jx.Deref(raw.Exchange))
-	t.Commission = jx.Deref(raw.Commission)
+	t.Commission = raw.Commission
 	t.NetAmount = raw.NetAmount
 	t.Account = gbkr.AccountID(jx.Deref(raw.Account))
 	t.CompanyName = jx.Deref(raw.CompanyName)

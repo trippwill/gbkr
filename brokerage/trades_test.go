@@ -74,8 +74,14 @@ func TestTradeExecution_UnmarshalJSON(t *testing.T) {
 	if te.TradeTimeEpoch != 1702317649000 {
 		t.Errorf("TradeTimeEpoch = %d", te.TradeTimeEpoch)
 	}
-	if !te.Size.Equal(num.FromFloat64(100)) {
-		t.Errorf("Size = %s", te.Size)
+	if !te.Quantity.Equal(num.FromFloat64(100)) {
+		t.Errorf("Quantity = %s", te.Quantity)
+	}
+	if !te.Price.Equal(num.FromString("175.50")) {
+		t.Errorf("Price = %s, want 175.50", te.Price)
+	}
+	if !te.Commission.Equal(num.FromString("1.00")) {
+		t.Errorf("Commission = %s, want 1.00", te.Commission)
 	}
 	if !te.NetAmount.Equal(num.FromFloat64(-17550.0)) {
 		t.Errorf("NetAmount = %s", te.NetAmount)
