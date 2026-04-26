@@ -28,7 +28,10 @@ type Transport struct {
 
 // Get performs an HTTP GET request.
 func (t *Transport) Get(ctx context.Context, path string, query url.Values, result any) error {
-	u := t.BaseURL + path
+	u, err := url.JoinPath(t.BaseURL, path)
+	if err != nil {
+		return fmt.Errorf("building request URL: %w", err)
+	}
 	if len(query) > 0 {
 		u += "?" + query.Encode()
 	}
@@ -52,7 +55,12 @@ func (t *Transport) Post(ctx context.Context, path string, body any, result any)
 		bodyReader = strings.NewReader(string(data))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.BaseURL+path, bodyReader)
+	u, err := url.JoinPath(t.BaseURL, path)
+	if err != nil {
+		return fmt.Errorf("building request URL: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bodyReader)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
@@ -72,6 +80,7 @@ func (t *Transport) doRequest(req *http.Request, result any) error {
 		defer t.Hook.AfterRequest(req.Method, path)
 	}
 
+	//nolint:gosec // G704: BaseURL is validated at client construction; user-configured gateway is by design.
 	resp, err := t.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)

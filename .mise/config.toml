@@ -2,7 +2,7 @@
 
 [tools]
 go = "1.25.7"
-golangci-lint = "2.9.0"
+golangci-lint = "2.11.4"
 
 [tasks.updeps]
 description = "Update all dependencies to their latest versions"

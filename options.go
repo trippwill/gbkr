@@ -2,17 +2,30 @@ package gbkr
 
 import (
 	"crypto/tls"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 )
 
 // Option configures a Client.
 type Option func(*Client) error
 
-// WithBaseURL sets the IBKR API base URL.
-func WithBaseURL(url string) Option {
+// WithBaseURL sets the IBKR API base URL. The URL must have an http or
+// https scheme and a non-empty host.
+func WithBaseURL(rawURL string) Option {
 	return func(c *Client) error {
-		c.t.BaseURL = url
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return fmt.Errorf("invalid base URL: %w", err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return fmt.Errorf("base URL scheme must be http or https, got %q", u.Scheme)
+		}
+		if u.Host == "" {
+			return fmt.Errorf("base URL must have a host")
+		}
+		c.t.BaseURL = rawURL
 		return nil
 	}
 }
