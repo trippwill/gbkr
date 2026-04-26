@@ -315,6 +315,45 @@ func TestSubscribeOrders(t *testing.T) {
 	}
 }
 
+func TestSubscribeOrders_NumericOrderID(t *testing.T) {
+	// IBKR gateway may send orderId as a JSON number.
+	srv := testWSServer(t, func(conn *websocket.Conn) {
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		_, _, _ = conn.Read(context.Background())
+
+		time.Sleep(50 * time.Millisecond)
+		msg := `{"topic":"sor","orderId":456,"account":"U1234567","status":"Submitted","filledQuantity":0,"avgPrice":0}`
+		if err := conn.Write(context.Background(), websocket.MessageText, []byte(msg)); err != nil {
+			return
+		}
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	})
+
+	stream := newTestStream(t, srv)
+
+	ch, cancel, err := brokerage.SubscribeOrders(stream)
+	if err != nil {
+		t.Fatalf("SubscribeOrders: %v", err)
+	}
+	defer cancel()
+
+	select {
+	case update := <-ch:
+		if update.OrderID != "456" {
+			t.Errorf("OrderID = %q, want %q (numeric JSON input)", update.OrderID, "456")
+		}
+		if update.Status != "Submitted" {
+			t.Errorf("Status = %q, want %q", update.Status, "Submitted")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for order update with numeric orderId")
+	}
+}
+
 func TestSubscribeTrades(t *testing.T) {
 	srv := testWSServer(t, func(conn *websocket.Conn) {
 		defer conn.Close(websocket.StatusNormalClosure, "")
@@ -373,12 +412,22 @@ func TestSubscribeOrders_Blocking(t *testing.T) {
 
 		time.Sleep(50 * time.Millisecond)
 		// Send enough orders to fill the buffer (32) plus 1.
+		// Mix numeric and string orderId encodings.
 		for i := range 33 {
-			msg, _ := json.Marshal(map[string]any{
-				"topic":   "sor",
-				"orderId": fmt.Sprintf("%d", i),
-				"status":  "Submitted",
-			})
+			var msg []byte
+			if i%2 == 0 {
+				msg, _ = json.Marshal(map[string]any{
+					"topic":   "sor",
+					"orderId": fmt.Sprintf("%d", i),
+					"status":  "Submitted",
+				})
+			} else {
+				msg, _ = json.Marshal(map[string]any{
+					"topic":   "sor",
+					"orderId": i,
+					"status":  "Submitted",
+				})
+			}
 			if err := conn.Write(context.Background(), websocket.MessageText, msg); err != nil {
 				return
 			}

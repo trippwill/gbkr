@@ -183,7 +183,13 @@ func SubscribeMarketDataHistory(s *gbkr.Stream, conID gbkr.ConID) (updates <-cha
 		if !active.Load() {
 			return
 		}
-		var wire wireHistoryBar
+		wire := wireHistoryBar{
+			Open:   num.Zero(),
+			High:   num.Zero(),
+			Low:    num.Zero(),
+			Close:  num.Zero(),
+			Volume: num.Zero(),
+		}
 		if err := json.Unmarshal(data, &wire); err != nil {
 			return
 		}
@@ -266,16 +272,16 @@ type OrderUpdate struct {
 	FilledQty num.Num
 	AvgPrice  num.Num
 	// Additional raw fields for extensibility.
-	Raw json.RawMessage
+	Raw json.RawMessage `json:"-"`
 }
 
 // wireOrderUpdate is the JSON wire format for order status updates.
 type wireOrderUpdate struct {
-	OrderID   string  `json:"orderId"`
-	Account   string  `json:"account"`
-	Status    string  `json:"status"`
-	FilledQty num.Num `json:"filledQuantity"`
-	AvgPrice  num.Num `json:"avgPrice"`
+	OrderID   json.RawMessage `json:"orderId"`
+	Account   string          `json:"account"`
+	Status    string          `json:"status"`
+	FilledQty num.Num         `json:"filledQuantity"`
+	AvgPrice  num.Num         `json:"avgPrice"`
 }
 
 // SubscribeOrders subscribes to live order status updates.
@@ -283,12 +289,15 @@ type wireOrderUpdate struct {
 func SubscribeOrders(s *gbkr.Stream) (updates <-chan OrderUpdate, cancel func(), err error) {
 	return brokerageSubscribe(s, "sor", "sor+{}", 32,
 		func(data json.RawMessage) (OrderUpdate, error) {
-			var wire wireOrderUpdate
+			wire := wireOrderUpdate{
+				FilledQty: num.Zero(),
+				AvgPrice:  num.Zero(),
+			}
 			if err := json.Unmarshal(data, &wire); err != nil {
 				return OrderUpdate{}, err
 			}
 			return OrderUpdate{
-				OrderID:   gbkr.OrderID(wire.OrderID),
+				OrderID:   gbkr.OrderID(normalizeJSONString(wire.OrderID)),
 				Account:   gbkr.AccountID(wire.Account),
 				Status:    wire.Status,
 				FilledQty: wire.FilledQty,
@@ -307,7 +316,7 @@ type TradeUpdate struct {
 	Quantity    num.Num
 	Price       num.Num
 	// Additional raw fields for extensibility.
-	Raw json.RawMessage
+	Raw json.RawMessage `json:"-"`
 }
 
 // wireTradeUpdate is the JSON wire format for trade execution updates.
@@ -325,7 +334,10 @@ type wireTradeUpdate struct {
 func SubscribeTrades(s *gbkr.Stream) (updates <-chan TradeUpdate, cancel func(), err error) {
 	return brokerageSubscribe(s, "str", "str+{}", 32,
 		func(data json.RawMessage) (TradeUpdate, error) {
-			var wire wireTradeUpdate
+			wire := wireTradeUpdate{
+				Quantity: num.Zero(),
+				Price:    num.Zero(),
+			}
 			if err := json.Unmarshal(data, &wire); err != nil {
 				return TradeUpdate{}, err
 			}
@@ -409,4 +421,19 @@ func brokerageSubscribe[T any](s *gbkr.Stream, topic, subCmd string, bufSize int
 func watchDone(ws *transport.WSConn, cancelFn func()) {
 	<-ws.Done()
 	cancelFn()
+}
+
+// normalizeJSONString extracts a string from a json.RawMessage that may
+// be either a JSON string ("123") or a JSON number (123). Returns the
+// unquoted string value in both cases.
+func normalizeJSONString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	// Not a JSON string — return the raw text (handles numeric values).
+	return strings.TrimSpace(string(raw))
 }
