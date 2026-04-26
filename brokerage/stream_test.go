@@ -14,6 +14,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/brokerage"
+	"github.com/trippwill/gbkr/num"
 )
 
 func testWSServer(t *testing.T, handler func(conn *websocket.Conn)) *httptest.Server {
@@ -88,8 +89,11 @@ func TestSubscribeMarketData(t *testing.T) {
 		if update.ConID != 265598 {
 			t.Errorf("ConID = %d, want 265598", update.ConID)
 		}
-		if _, ok := update.Fields[brokerage.FieldLast]; !ok {
+		lastFV, ok := update.Fields[brokerage.FieldLast]
+		if !ok {
 			t.Error("missing FieldLast")
+		} else if !lastFV.Num().Equal(num.FromString("142.50")) {
+			t.Errorf("FieldLast = %s, want 142.50", lastFV.Num())
 		}
 		if _, ok := update.Fields[brokerage.FieldBid]; !ok {
 			t.Error("missing FieldBid")
@@ -168,20 +172,20 @@ func TestSubscribeMarketDataHistory(t *testing.T) {
 		if bar.Time != "20260328 16:00:00" {
 			t.Errorf("Time = %q, want %q", bar.Time, "20260328 16:00:00")
 		}
-		if len(bar.Open) == 0 {
-			t.Error("Open should not be empty")
+		if bar.Open.IsZero() {
+			t.Error("Open should not be zero")
 		}
-		if len(bar.High) == 0 {
-			t.Error("High should not be empty")
+		if bar.High.IsZero() {
+			t.Error("High should not be zero")
 		}
-		if len(bar.Low) == 0 {
-			t.Error("Low should not be empty")
+		if bar.Low.IsZero() {
+			t.Error("Low should not be zero")
 		}
-		if len(bar.Close) == 0 {
-			t.Error("Close should not be empty")
+		if bar.Close.IsZero() {
+			t.Error("Close should not be zero")
 		}
-		if len(bar.Volume) == 0 {
-			t.Error("Volume should not be empty")
+		if bar.Volume.IsZero() {
+			t.Error("Volume should not be zero")
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for history bar")
@@ -294,6 +298,15 @@ func TestSubscribeOrders(t *testing.T) {
 		if update.Account != "U1234567" {
 			t.Errorf("Account = %q, want %q", update.Account, "U1234567")
 		}
+		if update.OrderID != "123" {
+			t.Errorf("OrderID = %q, want %q", update.OrderID, "123")
+		}
+		if !update.FilledQty.Equal(num.FromString("100")) {
+			t.Errorf("FilledQty = %s, want 100", update.FilledQty)
+		}
+		if !update.AvgPrice.Equal(num.FromString("145.50")) {
+			t.Errorf("AvgPrice = %s, want 145.50", update.AvgPrice)
+		}
 		if update.Raw == nil {
 			t.Error("Raw should not be nil")
 		}
@@ -308,7 +321,7 @@ func TestSubscribeTrades(t *testing.T) {
 		_, _, _ = conn.Read(context.Background())
 
 		time.Sleep(50 * time.Millisecond)
-		msg := `{"topic":"str","execution_id":"e1","symbol":"AAPL","side":"BUY","size":"100","price":"145.50"}`
+		msg := `{"topic":"str","execution_id":"e1","conid":265598,"symbol":"AAPL","side":"BUY","size":"100","price":"145.50"}`
 		if err := conn.Write(context.Background(), websocket.MessageText, []byte(msg)); err != nil {
 			return
 		}
@@ -335,6 +348,18 @@ func TestSubscribeTrades(t *testing.T) {
 		if update.Side != "BUY" {
 			t.Errorf("Side = %q, want %q", update.Side, "BUY")
 		}
+		if update.ConID != 265598 {
+			t.Errorf("ConID = %d, want 265598", update.ConID)
+		}
+		if !update.Quantity.Equal(num.FromString("100")) {
+			t.Errorf("Quantity = %s, want 100", update.Quantity)
+		}
+		if !update.Price.Equal(num.FromString("145.50")) {
+			t.Errorf("Price = %s, want 145.50", update.Price)
+		}
+		if update.Raw == nil {
+			t.Error("Raw should not be nil")
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for trade update")
 	}
@@ -351,7 +376,7 @@ func TestSubscribeOrders_Blocking(t *testing.T) {
 		for i := range 33 {
 			msg, _ := json.Marshal(map[string]any{
 				"topic":   "sor",
-				"orderId": i,
+				"orderId": fmt.Sprintf("%d", i),
 				"status":  "Submitted",
 			})
 			if err := conn.Write(context.Background(), websocket.MessageText, msg); err != nil {

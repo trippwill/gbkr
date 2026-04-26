@@ -12,14 +12,15 @@ import (
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/transport"
+	"github.com/trippwill/gbkr/num"
 )
 
 // MarketDataUpdate represents a streaming market data tick.
-// Field keys are [SnapshotField] constants; values are raw JSON
-// matching the REST /iserver/marketdata/snapshot field encoding.
+// Field keys are [SnapshotField] constants; values are [FieldValue]
+// using the same accessor API as REST /iserver/marketdata/snapshot.
 type MarketDataUpdate struct {
 	ConID  gbkr.ConID
-	Fields map[SnapshotField]json.RawMessage
+	Fields map[SnapshotField]FieldValue
 }
 
 // sendTimeout is the maximum time allowed for a subscribe/unsubscribe send.
@@ -69,13 +70,13 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 
 		update := MarketDataUpdate{
 			ConID:  conID,
-			Fields: make(map[SnapshotField]json.RawMessage, len(fields)),
+			Fields: make(map[SnapshotField]FieldValue, len(fields)),
 		}
 
 		for key, val := range raw {
 			sf := SnapshotField(key)
 			if _, ok := requested[sf]; ok {
-				update.Fields[sf] = val
+				update.Fields[sf] = FieldValue{raw: val}
 			}
 		}
 
@@ -138,16 +139,25 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 }
 
 // HistorySubscriptionBar represents a streaming historical bar update.
-// Topic: smh+{conid}. Numeric fields use [json.RawMessage] to preserve
-// the gateway's flexible encoding (string or number).
+// Topic: smh+{conid}.
 type HistorySubscriptionBar struct {
-	ConID  gbkr.ConID      `json:"-"`
-	Time   string          `json:"t"`
-	Open   json.RawMessage `json:"o"`
-	High   json.RawMessage `json:"h"`
-	Low    json.RawMessage `json:"l"`
-	Close  json.RawMessage `json:"c"`
-	Volume json.RawMessage `json:"v"`
+	ConID  gbkr.ConID
+	Time   string
+	Open   num.Num
+	High   num.Num
+	Low    num.Num
+	Close  num.Num
+	Volume num.Num
+}
+
+// wireHistoryBar is the JSON wire format for streaming historical bars.
+type wireHistoryBar struct {
+	Time   string  `json:"t"`
+	Open   num.Num `json:"o"`
+	High   num.Num `json:"h"`
+	Low    num.Num `json:"l"`
+	Close  num.Num `json:"c"`
+	Volume num.Num `json:"v"`
 }
 
 // SubscribeMarketDataHistory subscribes to streaming historical bar updates
@@ -173,11 +183,19 @@ func SubscribeMarketDataHistory(s *gbkr.Stream, conID gbkr.ConID) (updates <-cha
 		if !active.Load() {
 			return
 		}
-		var bar HistorySubscriptionBar
-		if err := json.Unmarshal(data, &bar); err != nil {
+		var wire wireHistoryBar
+		if err := json.Unmarshal(data, &wire); err != nil {
 			return
 		}
-		bar.ConID = conID
+		bar := HistorySubscriptionBar{
+			ConID:  conID,
+			Time:   wire.Time,
+			Open:   wire.Open,
+			High:   wire.High,
+			Low:    wire.Low,
+			Close:  wire.Close,
+			Volume: wire.Volume,
+		}
 
 		if obs := s.Observer(); obs != nil {
 			obs.OnMessageReceived(topic)
@@ -242,13 +260,22 @@ func SubscribeMarketDataHistory(s *gbkr.Stream, conID gbkr.ConID) (updates <-cha
 
 // OrderUpdate represents a streaming order status update. Topic: sor.
 type OrderUpdate struct {
-	OrderID   json.RawMessage `json:"orderId"`
-	Account   string          `json:"account"`
-	Status    string          `json:"status"`
-	FilledQty json.RawMessage `json:"filledQuantity"`
-	AvgPrice  json.RawMessage `json:"avgPrice"`
+	OrderID   gbkr.OrderID
+	Account   gbkr.AccountID
+	Status    string
+	FilledQty num.Num
+	AvgPrice  num.Num
 	// Additional raw fields for extensibility.
-	Raw json.RawMessage `json:"-"`
+	Raw json.RawMessage
+}
+
+// wireOrderUpdate is the JSON wire format for order status updates.
+type wireOrderUpdate struct {
+	OrderID   string  `json:"orderId"`
+	Account   string  `json:"account"`
+	Status    string  `json:"status"`
+	FilledQty num.Num `json:"filledQuantity"`
+	AvgPrice  num.Num `json:"avgPrice"`
 }
 
 // SubscribeOrders subscribes to live order status updates.
@@ -256,25 +283,41 @@ type OrderUpdate struct {
 func SubscribeOrders(s *gbkr.Stream) (updates <-chan OrderUpdate, cancel func(), err error) {
 	return brokerageSubscribe(s, "sor", "sor+{}", 32,
 		func(data json.RawMessage) (OrderUpdate, error) {
-			var u OrderUpdate
-			if err := json.Unmarshal(data, &u); err != nil {
+			var wire wireOrderUpdate
+			if err := json.Unmarshal(data, &wire); err != nil {
 				return OrderUpdate{}, err
 			}
-			u.Raw = data
-			return u, nil
+			return OrderUpdate{
+				OrderID:   gbkr.OrderID(wire.OrderID),
+				Account:   gbkr.AccountID(wire.Account),
+				Status:    wire.Status,
+				FilledQty: wire.FilledQty,
+				AvgPrice:  wire.AvgPrice,
+				Raw:       data,
+			}, nil
 		})
 }
 
 // TradeUpdate represents a streaming trade execution update. Topic: str.
 type TradeUpdate struct {
-	ExecutionID string          `json:"execution_id"`
-	ConID       json.RawMessage `json:"conid"`
-	Symbol      string          `json:"symbol"`
-	Side        string          `json:"side"`
-	Quantity    json.RawMessage `json:"size"`
-	Price       json.RawMessage `json:"price"`
+	ExecutionID string
+	ConID       gbkr.ConID
+	Symbol      string
+	Side        string
+	Quantity    num.Num
+	Price       num.Num
 	// Additional raw fields for extensibility.
-	Raw json.RawMessage `json:"-"`
+	Raw json.RawMessage
+}
+
+// wireTradeUpdate is the JSON wire format for trade execution updates.
+type wireTradeUpdate struct {
+	ExecutionID string  `json:"execution_id"`
+	ConID       int     `json:"conid"`
+	Symbol      string  `json:"symbol"`
+	Side        string  `json:"side"`
+	Quantity    num.Num `json:"size"`
+	Price       num.Num `json:"price"`
 }
 
 // SubscribeTrades subscribes to live trade execution updates.
@@ -282,12 +325,19 @@ type TradeUpdate struct {
 func SubscribeTrades(s *gbkr.Stream) (updates <-chan TradeUpdate, cancel func(), err error) {
 	return brokerageSubscribe(s, "str", "str+{}", 32,
 		func(data json.RawMessage) (TradeUpdate, error) {
-			var u TradeUpdate
-			if err := json.Unmarshal(data, &u); err != nil {
+			var wire wireTradeUpdate
+			if err := json.Unmarshal(data, &wire); err != nil {
 				return TradeUpdate{}, err
 			}
-			u.Raw = data
-			return u, nil
+			return TradeUpdate{
+				ExecutionID: wire.ExecutionID,
+				ConID:       gbkr.ConID(wire.ConID),
+				Symbol:      wire.Symbol,
+				Side:        wire.Side,
+				Quantity:    wire.Quantity,
+				Price:       wire.Price,
+				Raw:         data,
+			}, nil
 		})
 }
 
