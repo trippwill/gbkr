@@ -116,8 +116,8 @@ func TestFieldValue_Absent(t *testing.T) {
 	if fv.Present() {
 		t.Error("zero FieldValue should not be present")
 	}
-	if fv.Float64() != 0 {
-		t.Errorf("Float64() = %f, want 0", fv.Float64())
+	if !fv.Num().IsZero() {
+		t.Errorf("Num() = %s, want zero", fv.Num())
 	}
 	if fv.Int64() != 0 {
 		t.Errorf("Int64() = %d, want 0", fv.Int64())
@@ -138,8 +138,8 @@ func TestFieldValue_Numeric(t *testing.T) {
 	if !fv.Present() {
 		t.Error("should be present")
 	}
-	if fv.Float64() != 175.50 {
-		t.Errorf("Float64() = %f, want 175.50", fv.Float64())
+	if !fv.Num().Equal(num.FromString("175.50")) {
+		t.Errorf("Num() = %s, want 175.50", fv.Num())
 	}
 	if fv.String() != "175.5" {
 		t.Errorf("String() = %q, want %q", fv.String(), "175.5")
@@ -148,8 +148,8 @@ func TestFieldValue_Numeric(t *testing.T) {
 
 func TestFieldValue_StringEncoded(t *testing.T) {
 	fv := FieldValue{raw: json.RawMessage(`"123.45"`)}
-	if fv.Float64() != 123.45 {
-		t.Errorf("Float64() = %f, want 123.45", fv.Float64())
+	if !fv.Num().Equal(num.FromString("123.45")) {
+		t.Errorf("Num() = %s, want 123.45", fv.Num())
 	}
 	if fv.String() != "123.45" {
 		t.Errorf("String() = %q, want %q", fv.String(), "123.45")
@@ -394,16 +394,16 @@ func TestFieldValue_InvalidTypes(t *testing.T) {
 		t.Error("Bool() should be false for non-boolean string")
 	}
 
-	// Float64: string that can't be parsed as float triggers fallback to zero.
-	floatFV := FieldValue{raw: json.RawMessage(`"not_a_float"`)}
-	if floatFV.Float64() != 0 {
-		t.Errorf("Float64() = %f, want 0 for unparseable string", floatFV.Float64())
+	// Num: string that can't be parsed as number → Num with error.
+	numFV := FieldValue{raw: json.RawMessage(`"not_a_float"`)}
+	if numFV.Num().Err == nil {
+		t.Error("Num() should have error for unparseable string")
 	}
 
-	// Float64: non-string, non-number JSON (e.g. array) triggers fallback to zero.
+	// Num: non-string, non-number JSON (e.g. array) → Num with error.
 	arrayFV := FieldValue{raw: json.RawMessage(`[1,2,3]`)}
-	if arrayFV.Float64() != 0 {
-		t.Errorf("Float64() = %f, want 0 for array value", arrayFV.Float64())
+	if arrayFV.Num().Err == nil {
+		t.Error("Num() should have error for array value")
 	}
 }
 

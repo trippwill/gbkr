@@ -97,25 +97,6 @@ func (v FieldValue) Num() num.Num {
 	return n
 }
 
-// Float64 returns the value as float64, or 0 if absent or not numeric.
-func (v FieldValue) Float64() float64 {
-	if !v.Present() {
-		return 0
-	}
-	var f float64
-	if json.Unmarshal(v.raw, &f) == nil {
-		return f
-	}
-	// IBKR sometimes returns numeric fields as strings.
-	var s string
-	if json.Unmarshal(v.raw, &s) == nil {
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return f
-		}
-	}
-	return 0
-}
-
 // Int64 returns the value as int64, or 0 if absent or not numeric.
 func (v FieldValue) Int64() int64 {
 	if !v.Present() {
