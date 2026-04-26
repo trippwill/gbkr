@@ -55,3 +55,26 @@ func TestWithLogger_DefaultWhenNil(t *testing.T) {
 		t.Error("default logger should not be nil")
 	}
 }
+
+func TestWithBaseURL_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{"http", "http://localhost:5000/v1/api", false},
+		{"https", "https://gateway.example.com/v1/api", false},
+		{"no scheme", "localhost:5000", true},
+		{"ftp scheme", "ftp://localhost", true},
+		{"empty", "", true},
+		{"no host", "http://", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewClient(WithBaseURL(tt.url), WithRateLimit(nil))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("WithBaseURL(%q): err = %v, wantErr = %v", tt.url, err, tt.wantErr)
+			}
+		})
+	}
+}

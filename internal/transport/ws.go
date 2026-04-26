@@ -97,6 +97,7 @@ func DialWS(ctx context.Context, wsURL string, httpClient *http.Client, logger *
 
 	// Derive a non-cancelling context from the dial context so the read loop
 	// is not tied to the caller's deadline/cancellation.
+	//nolint:gosec // G118: cancelRead is stored in ws.cancelCtx and called in Close().
 	readCtx, cancelRead := context.WithCancel(context.WithoutCancel(ctx))
 
 	ws := &WSConn{
