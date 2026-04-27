@@ -71,8 +71,11 @@ func TestTradeExecution_UnmarshalJSON(t *testing.T) {
 	if te.Side != "B" {
 		t.Errorf("Side = %q", te.Side)
 	}
-	if te.TradeTimeEpoch != 1702317649000 {
-		t.Errorf("TradeTimeEpoch = %d", te.TradeTimeEpoch)
+	if te.TradeTime.IsZero() {
+		t.Error("TradeTime should not be zero")
+	}
+	if te.TradeTime.Time().UnixMilli() != 1702317649000 {
+		t.Errorf("TradeTime = %v, want epoch 1702317649000", te.TradeTime)
 	}
 	if !te.Quantity.Equal(num.FromFloat64(100)) {
 		t.Errorf("Quantity = %s", te.Quantity)

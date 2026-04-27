@@ -10,6 +10,7 @@ import (
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
 	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
 )
 
 // Trades provides read access to recent trade executions (brokerage session required).
@@ -51,10 +52,8 @@ type TradeExecution struct {
 	Side string
 	// OrderDescription is a human-readable order summary.
 	OrderDescription string
-	// TradeTime is the UTC trade time (format: "20231211-18:00:49").
-	TradeTime string
-	// TradeTimeEpoch is the epoch millisecond timestamp of the trade.
-	TradeTimeEpoch int64
+	// TradeTime is the UTC timestamp of the trade.
+	TradeTime when.DateTime
 	// Quantity is the number of units traded.
 	Quantity num.Num
 	// Price is the execution price.
@@ -114,8 +113,16 @@ func (t *TradeExecution) UnmarshalJSON(data []byte) error {
 	t.Symbol = jx.Deref(raw.Symbol)
 	t.Side = jx.Deref(raw.Side)
 	t.OrderDescription = jx.Deref(raw.OrderDescription)
-	t.TradeTime = jx.Deref(raw.TradeTime)
-	t.TradeTimeEpoch = jx.Deref(raw.TradeTimeEpoch)
+	// Prefer epoch (ms precision) over the string format.
+	if epoch := jx.Deref(raw.TradeTimeEpoch); epoch != 0 {
+		t.TradeTime = when.DateTimeFromEpoch(epoch)
+	} else if s := jx.Deref(raw.TradeTime); s != "" {
+		dt, err := when.ParseDateTime(s)
+		if err != nil {
+			return fmt.Errorf("parse trade_time %q: %w", s, err)
+		}
+		t.TradeTime = dt
+	}
 	t.Quantity = raw.Quantity
 	t.Price = raw.Price
 	t.OrderRef = jx.Deref(raw.OrderRef)

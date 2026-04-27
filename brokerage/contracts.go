@@ -9,6 +9,7 @@ import (
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
+	"github.com/trippwill/gbkr/when"
 )
 
 // Contracts provides read access to contract details.
@@ -57,7 +58,7 @@ type ContractDetails struct {
 	// Strike is the option strike price.
 	Strike float64
 	// Expiry is the contract expiry date (e.g., "20240119").
-	Expiry string
+	Expiry when.NullDate
 	// PutOrCall is "P" for put, "C" for call, or empty for non-options.
 	PutOrCall string
 	// UndConID is the underlying contract ID (for derivatives).
@@ -89,7 +90,7 @@ func (c *ContractDetails) UnmarshalJSON(data []byte) error {
 	c.Currency = gbkr.Currency(jx.Deref(raw.Currency))
 	c.Multiplier = jx.Deref(raw.Multiplier)
 	c.Strike = jx.Deref(raw.Strike)
-	c.Expiry = jx.Deref(raw.Expiry)
+	c.Expiry = parseNullDateFromJSON(jx.Deref(raw.Expiry))
 	c.PutOrCall = jx.Deref(raw.PutOrCall)
 	c.UndConID = gbkr.ConID(jx.Deref(raw.UndConID))
 	return nil

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/trippwill/gbkr/when"
 )
 
 func TestTradingSchedule(t *testing.T) {
@@ -57,18 +59,18 @@ func TestTradingSchedule(t *testing.T) {
 		if len(result.Schedules) != 2 {
 			t.Fatalf("schedules count = %d, want 2", len(result.Schedules))
 		}
-		day, ok := result.Schedules["20260303"]
+		day, ok := result.Schedules[when.NewDate(2026, 3, 3)]
 		if !ok {
-			t.Fatal("missing schedule for 20260303")
+			t.Fatal("missing schedule for 2026-03-03")
 		}
 		if len(day.LiquidHours) != 1 {
 			t.Fatalf("liquid_hours count = %d, want 1", len(day.LiquidHours))
 		}
-		if day.LiquidHours[0].Opening != 1766068200 {
-			t.Errorf("liquid opening = %d, want 1766068200", day.LiquidHours[0].Opening)
+		if !day.LiquidHours[0].Opening.Equal(when.DateTimeFromEpoch(1766068200)) {
+			t.Errorf("liquid opening = %v, want epoch 1766068200", day.LiquidHours[0].Opening)
 		}
-		if day.LiquidHours[0].Closing != 1766095200 {
-			t.Errorf("liquid closing = %d, want 1766095200", day.LiquidHours[0].Closing)
+		if !day.LiquidHours[0].Closing.Equal(when.DateTimeFromEpoch(1766095200)) {
+			t.Errorf("liquid closing = %v, want epoch 1766095200", day.LiquidHours[0].Closing)
 		}
 		if len(day.ExtendedHours) != 1 {
 			t.Fatalf("extended_hours count = %d, want 1", len(day.ExtendedHours))
@@ -127,19 +129,19 @@ func TestTradingSchedule(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, ok := result.Schedules["20261225"]; ok {
+		if _, ok := result.Schedules[when.NewDate(2026, 12, 25)]; ok {
 			t.Error("expected Dec 25 to be absent (holiday)")
 		}
 		// Dec 24 should have an early close
-		xmasEve, ok := result.Schedules["20261224"]
+		xmasEve, ok := result.Schedules[when.NewDate(2026, 12, 24)]
 		if !ok {
-			t.Fatalf("expected schedule for 20261224 (Christmas Eve) to be present")
+			t.Fatalf("expected schedule for 2026-12-24 (Christmas Eve) to be present")
 		}
 		if len(xmasEve.LiquidHours) == 0 {
-			t.Fatalf("expected at least one liquid hours entry for 20261224 (Christmas Eve)")
+			t.Fatalf("expected at least one liquid hours entry for 2026-12-24 (Christmas Eve)")
 		}
-		if xmasEve.LiquidHours[0].Closing != 1766600100 {
-			t.Errorf("Christmas Eve close = %d, expected early close timestamp", xmasEve.LiquidHours[0].Closing)
+		if !xmasEve.LiquidHours[0].Closing.Equal(when.DateTimeFromEpoch(1766600100)) {
+			t.Errorf("Christmas Eve close = %v, expected early close timestamp", xmasEve.LiquidHours[0].Closing)
 		}
 	})
 }

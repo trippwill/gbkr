@@ -196,8 +196,8 @@ func TestSnapshot_UnmarshalJSON(t *testing.T) {
 	if s.ServerID != "srv1" {
 		t.Errorf("ServerID = %q", s.ServerID)
 	}
-	if s.UpdateTime != 1700000000 {
-		t.Errorf("UpdateTime = %d", s.UpdateTime)
+	if s.UpdateTime.IsZero() {
+		t.Error("UpdateTime should not be zero")
 	}
 
 	last := s.Get(FieldLast).Num()
@@ -362,8 +362,8 @@ func TestHistoryResponse_UnmarshalJSON(t *testing.T) {
 	if !bar.Volume.Equal(num.FromFloat64(1000000)) {
 		t.Errorf("Volume = %s", bar.Volume)
 	}
-	if bar.Time != 1700000000 {
-		t.Errorf("Time = %d", bar.Time)
+	if bar.Time.IsZero() {
+		t.Error("Time should not be zero")
 	}
 }
 

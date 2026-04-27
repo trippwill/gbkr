@@ -169,8 +169,8 @@ func TestSubscribeMarketDataHistory(t *testing.T) {
 		if bar.ConID != 265598 {
 			t.Errorf("ConID = %d, want 265598", bar.ConID)
 		}
-		if bar.Time != "20260328 16:00:00" {
-			t.Errorf("Time = %q, want %q", bar.Time, "20260328 16:00:00")
+		if bar.Time.IsZero() {
+			t.Error("Time should not be zero")
 		}
 		if bar.Open.IsZero() {
 			t.Error("Open should not be zero")

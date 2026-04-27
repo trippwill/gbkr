@@ -13,6 +13,7 @@ import (
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
 	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
 )
 
 // MarketData provides read access to IBKR market data.
@@ -159,9 +160,9 @@ type SnapshotParams struct {
 // Metadata fields (ConID, ServerID, UpdateTime) are always populated.
 // Dynamic market data fields are accessed via Get.
 type Snapshot struct {
-	ConID      gbkr.ConID // Contract identifier.
-	ServerID   string     // Internal server ID. (API: "server_id")
-	UpdateTime int64      // Last update epoch timestamp. (API: "_updated")
+	ConID      gbkr.ConID    // Contract identifier.
+	ServerID   string        // Internal server ID. (API: "server_id")
+	UpdateTime when.DateTime // Last update timestamp. (API: "_updated")
 	fields     map[SnapshotField]json.RawMessage
 }
 
@@ -212,7 +213,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	if raw, ok := all["_updated"]; ok {
 		var v int64
 		if json.Unmarshal(raw, &v) == nil {
-			s.UpdateTime = v
+			s.UpdateTime = when.DateTimeFromEpoch(v)
 		}
 		delete(all, "_updated")
 	}
@@ -314,14 +315,14 @@ func (s Snapshot) AsPnL() (PnLSnapshot, bool) {
 
 // BondSnapshot is a strongly-typed projection of a Snapshot using FieldsBond.
 type BondSnapshot struct {
-	LastYield       num.Num // Last yield value.
-	BidYield        num.Num // Bid yield value.
-	AskYield        num.Num // Ask yield value.
-	Ratings         string  // Credit ratings.
-	BondType        string  // Bond type classification.
-	DebtClass       string  // Debt class (e.g. senior, subordinated).
-	IssueDate       string  // Bond issue date.
-	LastTradingDate string  // Last trading date for the bond.
+	LastYield       num.Num       // Last yield value.
+	BidYield        num.Num       // Bid yield value.
+	AskYield        num.Num       // Ask yield value.
+	Ratings         string        // Credit ratings.
+	BondType        string        // Bond type classification.
+	DebtClass       string        // Debt class (e.g. senior, subordinated).
+	IssueDate       when.NullDate // Bond issue date.
+	LastTradingDate when.NullDate // Last trading date for the bond.
 }
 
 // AsBond projects the snapshot into a BondSnapshot struct.
@@ -334,8 +335,8 @@ func (s Snapshot) AsBond() (BondSnapshot, bool) {
 		Ratings:         s.Get(FieldRatings).String(),
 		BondType:        s.Get(FieldBondType).String(),
 		DebtClass:       s.Get(FieldDebtClass).String(),
-		IssueDate:       s.Get(FieldIssueDate).String(),
-		LastTradingDate: s.Get(FieldLastTradingDate).String(),
+		IssueDate:       parseNullDateFromJSON(s.Get(FieldIssueDate).String()),
+		LastTradingDate: parseNullDateFromJSON(s.Get(FieldLastTradingDate).String()),
 	}, s.hasAll(FieldsBond)
 }
 
@@ -374,12 +375,12 @@ func (h *HistoryResponse) UnmarshalJSON(data []byte) error {
 
 // HistoryBar represents a single OHLCV bar in a history response.
 type HistoryBar struct {
-	Open   num.Num // Open price. (API: "o")
-	High   num.Num // High price. (API: "h")
-	Low    num.Num // Low price. (API: "l")
-	Close  num.Num // Close price. (API: "c")
-	Volume num.Num // Volume. (API: "v")
-	Time   int64   // Epoch unix timestamp. (API: "t")
+	Open   num.Num       // Open price. (API: "o")
+	High   num.Num       // High price. (API: "h")
+	Low    num.Num       // Low price. (API: "l")
+	Close  num.Num       // Close price. (API: "c")
+	Volume num.Num       // Volume. (API: "v")
+	Time   when.DateTime // Bar timestamp. (API: "t")
 }
 
 func (b *HistoryBar) UnmarshalJSON(data []byte) error {
@@ -405,6 +406,8 @@ func (b *HistoryBar) UnmarshalJSON(data []byte) error {
 	b.Low = raw.Low
 	b.Close = raw.Close
 	b.Volume = raw.Volume
-	b.Time = jx.Deref(raw.Time)
+	if raw.Time != nil {
+		b.Time = when.DateTimeFromEpoch(*raw.Time)
+	}
 	return nil
 }
