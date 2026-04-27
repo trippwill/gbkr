@@ -261,6 +261,372 @@ func TestValidate_CommissionDetails(t *testing.T) {
 	}
 }
 
+// TestTradeFieldZero_AllFields exercises every switch branch in tradeFieldZero.
+func TestTradeFieldZero_AllFields(t *testing.T) {
+	// Build a Trade with all fields populated (non-zero).
+	full := Trade{
+		TransactionID: "T1",
+		TradeID:       "TR1",
+		OrderID:       "O1",
+		ExecID:        "E1",
+		AccountID:     "U123",
+		ConID:         42,
+		Symbol:        "AAPL",
+		Underlying:    "AAPL",
+		UnderlyingID:  42,
+		AssetClass:    "STK",
+		Side:          "BUY",
+		Quantity:      num.FromInt64(100),
+		Price:         num.FromInt64(150),
+		TradeMoney:    num.FromInt64(15000),
+		Proceeds:      num.FromInt64(-15000),
+		Commission:    num.FromInt64(-1),
+		Taxes:         num.FromInt64(0), // num.FromInt64(0) is still zero-value
+		NetCash:       num.NullNum{Num: num.FromInt64(100), Valid: true},
+		CostBasis:     num.NullNum{Num: num.FromInt64(100), Valid: true},
+		RealizedPnL:   num.NullNum{Num: num.FromInt64(50), Valid: true},
+		Strike:        num.NullNum{Num: num.FromInt64(150), Valid: true},
+		Expiry:        when.NullDate{Date: when.NewDate(2026, 3, 20), Valid: true},
+		PutCall:       "C",
+		OpenClose:     "O",
+		OrderRef:      "REF1",
+		Currency:      "USD",
+		Multiplier:    num.FromInt64(100),
+		TradeDate:     when.NewDate(2026, 1, 15),
+		SettleDate:    when.NullDate{Date: when.NewDate(2026, 1, 17), Valid: true},
+	}
+
+	fields := []string{
+		"TransactionID", "TradeID", "OrderID", "ExecID", "AccountID",
+		"ConID", "Symbol", "Underlying", "UnderlyingID", "AssetClass",
+		"Side", "Quantity", "Price", "TradeMoney", "Proceeds",
+		"Commission", "Taxes", "NetCash", "CostBasis", "RealizedPnL",
+		"Strike", "Expiry", "PutCall", "OpenClose", "OrderRef",
+		"Currency", "Multiplier", "TradeDate", "SettleDate",
+	}
+
+	// Num fields that use .IsZero() — an uninitialized Num{} is not Ok(),
+	// so IsZero() returns false; skip these in the zero-struct check.
+	numFields := map[string]bool{
+		"Quantity": true, "Price": true, "TradeMoney": true,
+		"Proceeds": true, "Commission": true, "Taxes": true, "Multiplier": true,
+	}
+
+	// Verify non-zero trade reports false for all known fields.
+	for _, f := range fields {
+		if f == "Taxes" {
+			continue // FromInt64(0) is zero-valued for Num
+		}
+		if tradeFieldZero(&full, f) {
+			t.Errorf("tradeFieldZero(&full, %q) = true, want false", f)
+		}
+	}
+
+	// Verify zero-valued trade reports true for all known fields
+	// (except Num fields whose zero-value struct is invalid, not zero).
+	var zero Trade
+	for _, f := range fields {
+		if numFields[f] {
+			continue
+		}
+		if !tradeFieldZero(&zero, f) {
+			t.Errorf("tradeFieldZero(&zero, %q) = false, want true", f)
+		}
+	}
+
+	// Num fields: verify that FromInt64(0) is zero.
+	zeroNum := Trade{
+		Quantity:   num.FromInt64(0),
+		Price:      num.FromInt64(0),
+		TradeMoney: num.FromInt64(0),
+		Proceeds:   num.FromInt64(0),
+		Commission: num.FromInt64(0),
+		Taxes:      num.FromInt64(0),
+		Multiplier: num.FromInt64(0),
+	}
+	for f := range numFields {
+		if !tradeFieldZero(&zeroNum, f) {
+			t.Errorf("tradeFieldZero(&zeroNum, %q) = false, want true", f)
+		}
+	}
+
+	// Unknown field always returns true.
+	if !tradeFieldZero(&full, "BogusField") {
+		t.Error("tradeFieldZero for unknown field should return true")
+	}
+}
+
+// TestCashTxFieldZero_AllFields exercises every switch branch in cashTxFieldZero.
+func TestCashTxFieldZero_AllFields(t *testing.T) {
+	full := CashTransaction{
+		TransactionID: "CT1",
+		AccountID:     "U123",
+		ConID:         42,
+		Symbol:        "AAPL",
+		Type:          "Dividends",
+		Amount:        num.FromInt64(100),
+		Currency:      "USD",
+		Description:   "Dividend payment",
+		ReportDate:    when.NewDate(2026, 3, 1),
+		SettleDate:    when.NewDate(2026, 3, 3),
+	}
+
+	fields := []string{
+		"TransactionID", "AccountID", "ConID", "Symbol", "Type",
+		"Amount", "Currency", "Description", "ReportDate", "SettleDate",
+	}
+
+	for _, f := range fields {
+		if cashTxFieldZero(&full, f) {
+			t.Errorf("cashTxFieldZero(&full, %q) = true, want false", f)
+		}
+	}
+
+	// Amount is a Num field — uninitialized Num{} is not IsZero().
+	var zero CashTransaction
+	for _, f := range fields {
+		if f == "Amount" {
+			continue
+		}
+		if !cashTxFieldZero(&zero, f) {
+			t.Errorf("cashTxFieldZero(&zero, %q) = false, want true", f)
+		}
+	}
+
+	// Verify Amount with explicit zero Num.
+	zeroAmt := CashTransaction{Amount: num.FromInt64(0)}
+	if !cashTxFieldZero(&zeroAmt, "Amount") {
+		t.Error("cashTxFieldZero(&zeroAmt, \"Amount\") = false, want true")
+	}
+
+	if !cashTxFieldZero(&full, "BogusField") {
+		t.Error("cashTxFieldZero for unknown field should return true")
+	}
+}
+
+// TestOptionEventFieldZero_AllFields exercises every switch branch in optionEventFieldZero.
+func TestOptionEventFieldZero_AllFields(t *testing.T) {
+	full := OptionEvent{
+		TransactionType: "Expiration",
+		AccountID:       "U123",
+		ConID:           99,
+		Symbol:          "SPY260320C500",
+		Underlying:      "SPY",
+		UnderlyingID:    78,
+		Strike:          num.FromInt64(500),
+		Expiry:          when.NullDate{Date: when.NewDate(2026, 3, 20), Valid: true},
+		PutCall:         "C",
+		Quantity:        num.FromInt64(-1),
+		Proceeds:        num.FromInt64(100),
+		RealizedPnL:     num.FromInt64(50),
+		TradeDate:       when.NewDate(2026, 3, 20),
+		Currency:        "USD",
+		Multiplier:      num.FromInt64(100),
+	}
+
+	fields := []string{
+		"TransactionType", "AccountID", "ConID", "Symbol", "Underlying",
+		"UnderlyingID", "Strike", "Expiry", "PutCall", "Quantity",
+		"Proceeds", "RealizedPnL", "TradeDate", "Currency", "Multiplier",
+	}
+
+	for _, f := range fields {
+		if optionEventFieldZero(&full, f) {
+			t.Errorf("optionEventFieldZero(&full, %q) = true, want false", f)
+		}
+	}
+
+	// Num fields — uninitialized Num{} is not IsZero().
+	oeNumFields := map[string]bool{
+		"Strike": true, "Quantity": true, "Proceeds": true,
+		"RealizedPnL": true, "Multiplier": true,
+	}
+
+	var zero OptionEvent
+	for _, f := range fields {
+		if oeNumFields[f] {
+			continue
+		}
+		if !optionEventFieldZero(&zero, f) {
+			t.Errorf("optionEventFieldZero(&zero, %q) = false, want true", f)
+		}
+	}
+
+	// Verify Num fields with explicit zero values.
+	zeroOE := OptionEvent{
+		Strike:      num.FromInt64(0),
+		Quantity:    num.FromInt64(0),
+		Proceeds:    num.FromInt64(0),
+		RealizedPnL: num.FromInt64(0),
+		Multiplier:  num.FromInt64(0),
+	}
+	for f := range oeNumFields {
+		if !optionEventFieldZero(&zeroOE, f) {
+			t.Errorf("optionEventFieldZero(&zeroOE, %q) = false, want true", f)
+		}
+	}
+
+	if !optionEventFieldZero(&full, "BogusField") {
+		t.Error("optionEventFieldZero for unknown field should return true")
+	}
+}
+
+// TestCommissionDetailFieldZero_AllFields exercises every switch branch in commissionDetailFieldZero.
+func TestCommissionDetailFieldZero_AllFields(t *testing.T) {
+	full := CommissionDetail{
+		AccountID:                  "U123",
+		ConID:                      42,
+		Symbol:                     "AAPL",
+		TradeID:                    "T1",
+		ExecID:                     "E1",
+		BrokerExecutionCharge:      num.FromInt64(1),
+		BrokerClearingCharge:       num.FromInt64(2),
+		ThirdPartyExecutionCharge:  num.FromInt64(3),
+		RegFINRATradingActivityFee: num.FromInt64(4),
+		RegSection31TransactionFee: num.FromInt64(5),
+		Currency:                   "USD",
+		TradeDate:                  when.NewDate(2026, 1, 15),
+	}
+
+	fields := []string{
+		"AccountID", "ConID", "Symbol", "TradeID", "ExecID",
+		"BrokerExecutionCharge", "BrokerClearingCharge",
+		"ThirdPartyExecutionCharge", "RegFINRATradingActivityFee",
+		"RegSection31TransactionFee", "Currency", "TradeDate",
+	}
+
+	for _, f := range fields {
+		if commissionDetailFieldZero(&full, f) {
+			t.Errorf("commissionDetailFieldZero(&full, %q) = true, want false", f)
+		}
+	}
+
+	// Num fields — uninitialized Num{} is not IsZero().
+	cdNumFields := map[string]bool{
+		"BrokerExecutionCharge": true, "BrokerClearingCharge": true,
+		"ThirdPartyExecutionCharge": true, "RegFINRATradingActivityFee": true,
+		"RegSection31TransactionFee": true,
+	}
+
+	var zero CommissionDetail
+	for _, f := range fields {
+		if cdNumFields[f] {
+			continue
+		}
+		if !commissionDetailFieldZero(&zero, f) {
+			t.Errorf("commissionDetailFieldZero(&zero, %q) = false, want true", f)
+		}
+	}
+
+	// Verify Num fields with explicit zero values.
+	zeroCD := CommissionDetail{
+		BrokerExecutionCharge:      num.FromInt64(0),
+		BrokerClearingCharge:       num.FromInt64(0),
+		ThirdPartyExecutionCharge:  num.FromInt64(0),
+		RegFINRATradingActivityFee: num.FromInt64(0),
+		RegSection31TransactionFee: num.FromInt64(0),
+	}
+	for f := range cdNumFields {
+		if !commissionDetailFieldZero(&zeroCD, f) {
+			t.Errorf("commissionDetailFieldZero(&zeroCD, %q) = false, want true", f)
+		}
+	}
+
+	if !commissionDetailFieldZero(&full, "BogusField") {
+		t.Error("commissionDetailFieldZero for unknown field should return true")
+	}
+}
+
+// TestValidate_AllFieldsInAllSections validates all fields across all four
+// section types through the Validate entry point, ensuring full integration
+// coverage of the field-zero helpers.
+func TestValidate_AllFieldsInAllSections(t *testing.T) {
+	stmt := Statement{
+		Trades: []Trade{
+			{
+				TransactionID: "T1", TradeID: "TR1", OrderID: "O1", ExecID: "E1",
+				AccountID: "U123", ConID: 42, Symbol: "AAPL", Underlying: "AAPL",
+				UnderlyingID: 42, AssetClass: "STK", Side: "BUY",
+				Quantity: num.FromInt64(100), Price: num.FromInt64(150),
+				TradeMoney: num.FromInt64(15000), Proceeds: num.FromInt64(-15000),
+				Commission: num.FromInt64(-1), Taxes: num.FromInt64(1),
+				NetCash:     num.NullNum{Num: num.FromInt64(100), Valid: true},
+				CostBasis:   num.NullNum{Num: num.FromInt64(100), Valid: true},
+				RealizedPnL: num.NullNum{Num: num.FromInt64(50), Valid: true},
+				Strike:      num.NullNum{Num: num.FromInt64(150), Valid: true},
+				Expiry:      when.NullDate{Date: when.NewDate(2026, 3, 20), Valid: true},
+				PutCall:     "C", OpenClose: "O", OrderRef: "REF1", Currency: "USD",
+				Multiplier: num.FromInt64(100), TradeDate: when.NewDate(2026, 1, 15),
+				SettleDate: when.NullDate{Date: when.NewDate(2026, 1, 17), Valid: true},
+			},
+		},
+		CashTransactions: []CashTransaction{
+			{
+				TransactionID: "CT1", AccountID: "U123", ConID: 42, Symbol: "AAPL",
+				Type: "Dividends", Amount: num.FromInt64(100), Currency: "USD",
+				Description: "Dividend", ReportDate: when.NewDate(2026, 3, 1),
+				SettleDate: when.NewDate(2026, 3, 3),
+			},
+		},
+		OptionEvents: []OptionEvent{
+			{
+				TransactionType: "Expiration", AccountID: "U123", ConID: 99,
+				Symbol: "SPY260320C500", Underlying: "SPY", UnderlyingID: 78,
+				Strike:  num.FromInt64(500),
+				Expiry:  when.NullDate{Date: when.NewDate(2026, 3, 20), Valid: true},
+				PutCall: "C", Quantity: num.FromInt64(-1), Proceeds: num.FromInt64(100),
+				RealizedPnL: num.FromInt64(50), TradeDate: when.NewDate(2026, 3, 20),
+				Currency: "USD", Multiplier: num.FromInt64(100),
+			},
+		},
+		CommissionDetails: []CommissionDetail{
+			{
+				AccountID: "U123", ConID: 42, Symbol: "AAPL", TradeID: "T1",
+				ExecID: "E1", BrokerExecutionCharge: num.FromInt64(1),
+				BrokerClearingCharge:       num.FromInt64(2),
+				ThirdPartyExecutionCharge:  num.FromInt64(3),
+				RegFINRATradingActivityFee: num.FromInt64(4),
+				RegSection31TransactionFee: num.FromInt64(5),
+				Currency:                   "USD", TradeDate: when.NewDate(2026, 1, 15),
+			},
+		},
+	}
+
+	required := RequiredFields{
+		Sections: map[string][]string{
+			"Trades": {
+				"TransactionID", "TradeID", "OrderID", "ExecID", "AccountID",
+				"ConID", "Symbol", "Underlying", "UnderlyingID", "AssetClass",
+				"Side", "Quantity", "Price", "TradeMoney", "Proceeds",
+				"Commission", "Taxes", "NetCash", "CostBasis", "RealizedPnL",
+				"Strike", "Expiry", "PutCall", "OpenClose", "OrderRef",
+				"Currency", "Multiplier", "TradeDate", "SettleDate",
+			},
+			"CashTransactions": {
+				"TransactionID", "AccountID", "ConID", "Symbol", "Type",
+				"Amount", "Currency", "Description", "ReportDate", "SettleDate",
+			},
+			"OptionEvents": {
+				"TransactionType", "AccountID", "ConID", "Symbol", "Underlying",
+				"UnderlyingID", "Strike", "Expiry", "PutCall", "Quantity",
+				"Proceeds", "RealizedPnL", "TradeDate", "Currency", "Multiplier",
+			},
+			"CommissionDetails": {
+				"AccountID", "ConID", "Symbol", "TradeID", "ExecID",
+				"BrokerExecutionCharge", "BrokerClearingCharge",
+				"ThirdPartyExecutionCharge", "RegFINRATradingActivityFee",
+				"RegSection31TransactionFee", "Currency", "TradeDate",
+			},
+		},
+	}
+
+	result := stmt.Validate(required)
+	if !result.OK() {
+		t.Errorf("expected OK with all fields populated, got MissingSections=%v, EmptyFields=%v",
+			result.MissingSections, result.EmptyFields)
+	}
+}
+
 func TestValidateResult_OK(t *testing.T) {
 	tests := []struct {
 		name   string
