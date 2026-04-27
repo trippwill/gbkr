@@ -1100,3 +1100,53 @@ func TestFetchReport_WithDateRange_ZeroDatesIgnored(t *testing.T) {
 		t.Errorf("td = %q, want empty (zero dates should be ignored)", got)
 	}
 }
+
+func TestFetchReport_WithPeriod_NonPositiveIgnored(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, stmtData)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	from := when.NewDate(2026, 3, 1)
+	to := when.NewDate(2026, 3, 31)
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(0),
+		WithDateRange(from, to),
+		WithPeriod(0), // Non-positive: should be ignored, not clear date range
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	// Date range should still be set (WithPeriod(0) was ignored)
+	if got := capturedQuery.Get("fd"); got != "20260301" {
+		t.Errorf("fd = %q, want %q (non-positive period should not clear dates)", got, "20260301")
+	}
+	if got := capturedQuery.Get("td"); got != "20260331" {
+		t.Errorf("td = %q, want %q (non-positive period should not clear dates)", got, "20260331")
+	}
+	if got := capturedQuery.Get("p"); got != "" {
+		t.Errorf("p = %q, want empty (non-positive period ignored)", got)
+	}
+}

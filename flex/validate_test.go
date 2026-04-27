@@ -174,7 +174,7 @@ func TestValidate_EmptyRequiredFields(t *testing.T) {
 }
 
 func TestValidate_NullableFieldZero(t *testing.T) {
-	// NullNum/NullDate fields: Ok() == false means zero.
+	// NullNum/NullDate fields: Valid == false means zero (absent).
 	stmt := Statement{
 		Trades: []Trade{
 			{TransactionID: "T1", Strike: num.NullNum{}, Expiry: when.NullDate{}},

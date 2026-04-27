@@ -1,5 +1,7 @@
 package flex
 
+import "github.com/trippwill/gbkr/num"
+
 // RequiredFields specifies which Statement sections and fields a consumer
 // expects. Keys are section names matching Statement struct field names
 // (e.g., "Trades", "CashTransactions"). Values are field names within
@@ -104,6 +106,11 @@ func (s *Statement) Validate(required RequiredFields) ValidationResult {
 }
 
 // Field zero-check helpers — explicit switch on field name, no reflection.
+// For num.Num fields, a value is considered "zero" if it is uninitialized (!Ok())
+// or its numeric value is zero. This ensures that missing/invalid parse results
+// are treated as empty rather than silently passing validation.
+
+func numZero(n num.Num) bool { return !n.Ok() || n.IsZero() }
 
 func tradeFieldZero(t *Trade, field string) bool {
 	switch field {
@@ -130,17 +137,17 @@ func tradeFieldZero(t *Trade, field string) bool {
 	case "Side":
 		return t.Side == ""
 	case "Quantity":
-		return t.Quantity.IsZero()
+		return numZero(t.Quantity)
 	case "Price":
-		return t.Price.IsZero()
+		return numZero(t.Price)
 	case "TradeMoney":
-		return t.TradeMoney.IsZero()
+		return numZero(t.TradeMoney)
 	case "Proceeds":
-		return t.Proceeds.IsZero()
+		return numZero(t.Proceeds)
 	case "Commission":
-		return t.Commission.IsZero()
+		return numZero(t.Commission)
 	case "Taxes":
-		return t.Taxes.IsZero()
+		return numZero(t.Taxes)
 	case "NetCash":
 		return !t.NetCash.Valid
 	case "CostBasis":
@@ -160,7 +167,7 @@ func tradeFieldZero(t *Trade, field string) bool {
 	case "Currency":
 		return t.Currency == ""
 	case "Multiplier":
-		return t.Multiplier.IsZero()
+		return numZero(t.Multiplier)
 	case "TradeDate":
 		return t.TradeDate.IsZero()
 	case "SettleDate":
@@ -183,7 +190,7 @@ func cashTxFieldZero(ct *CashTransaction, field string) bool {
 	case "Type":
 		return ct.Type == ""
 	case "Amount":
-		return ct.Amount.IsZero()
+		return numZero(ct.Amount)
 	case "Currency":
 		return ct.Currency == ""
 	case "Description":
@@ -212,23 +219,23 @@ func optionEventFieldZero(oe *OptionEvent, field string) bool {
 	case "UnderlyingID":
 		return oe.UnderlyingID == 0
 	case "Strike":
-		return oe.Strike.IsZero()
+		return numZero(oe.Strike)
 	case "Expiry":
 		return !oe.Expiry.Valid
 	case "PutCall":
 		return oe.PutCall == ""
 	case "Quantity":
-		return oe.Quantity.IsZero()
+		return numZero(oe.Quantity)
 	case "Proceeds":
-		return oe.Proceeds.IsZero()
+		return numZero(oe.Proceeds)
 	case "RealizedPnL":
-		return oe.RealizedPnL.IsZero()
+		return numZero(oe.RealizedPnL)
 	case "TradeDate":
 		return oe.TradeDate.IsZero()
 	case "Currency":
 		return oe.Currency == ""
 	case "Multiplier":
-		return oe.Multiplier.IsZero()
+		return numZero(oe.Multiplier)
 	default:
 		return true
 	}
@@ -247,15 +254,15 @@ func commissionDetailFieldZero(cd *CommissionDetail, field string) bool {
 	case "ExecID":
 		return cd.ExecID == ""
 	case "BrokerExecutionCharge":
-		return cd.BrokerExecutionCharge.IsZero()
+		return numZero(cd.BrokerExecutionCharge)
 	case "BrokerClearingCharge":
-		return cd.BrokerClearingCharge.IsZero()
+		return numZero(cd.BrokerClearingCharge)
 	case "ThirdPartyExecutionCharge":
-		return cd.ThirdPartyExecutionCharge.IsZero()
+		return numZero(cd.ThirdPartyExecutionCharge)
 	case "RegFINRATradingActivityFee":
-		return cd.RegFINRATradingActivityFee.IsZero()
+		return numZero(cd.RegFINRATradingActivityFee)
 	case "RegSection31TransactionFee":
-		return cd.RegSection31TransactionFee.IsZero()
+		return numZero(cd.RegSection31TransactionFee)
 	case "Currency":
 		return cd.Currency == ""
 	case "TradeDate":

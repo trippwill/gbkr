@@ -331,8 +331,12 @@ func WithDateRange(from, to when.Date) FetchOption {
 // WithPeriod overrides the saved Flex Query period with a number of calendar days.
 // The period is sent as the p query parameter.
 // Overrides any prior [WithDateRange] call (last-wins semantics).
+// Non-positive values are ignored.
 func WithPeriod(days int) FetchOption {
 	return func(fc *fetchConfig) {
+		if days <= 0 {
+			return
+		}
 		fc.period = days
 		fc.dateFrom = ""
 		fc.dateTo = ""
