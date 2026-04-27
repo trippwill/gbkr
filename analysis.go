@@ -9,6 +9,7 @@ import (
 
 	"github.com/trippwill/gbkr/internal/jx"
 	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
 )
 
 // TransactionHistoryRequest is the request body for POST /pa/transactions.
@@ -23,10 +24,10 @@ type TransactionHistoryRequest struct {
 type TransactionHistoryResponse struct {
 	// Currency is the reporting currency.
 	Currency Currency
-	// From is the epoch start time of the range.
-	From int64
-	// To is the epoch end time of the range.
-	To int64
+	// From is the start time of the range.
+	From when.DateTime
+	// To is the end time of the range.
+	To when.DateTime
 	// IncludesRealTime indicates if trades are up to date.
 	IncludesRealTime bool
 	// Transactions is the list of transactions.
@@ -45,8 +46,8 @@ func (r *TransactionHistoryResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	r.Currency = Currency(jx.Deref(raw.Currency))
-	r.From = jx.Deref(raw.From)
-	r.To = jx.Deref(raw.To)
+	r.From = when.DateTimeFromEpoch(jx.Deref(raw.From))
+	r.To = when.DateTimeFromEpoch(jx.Deref(raw.To))
 	r.IncludesRealTime = jx.Deref(raw.IncludesRealTime)
 	if raw.Transactions != nil {
 		if err := json.Unmarshal(*raw.Transactions, &r.Transactions); err != nil {
@@ -58,8 +59,8 @@ func (r *TransactionHistoryResponse) UnmarshalJSON(data []byte) error {
 
 // Transaction represents a single transaction from POST /pa/transactions.
 type Transaction struct {
-	// Date is the human-readable datetime of the transaction.
-	Date string
+	// Date is the datetime of the transaction.
+	Date when.DateTime
 	// Currency is the traded instrument currency.
 	Currency Currency
 	// FxRate is the forex conversion rate.
@@ -100,7 +101,12 @@ func (t *Transaction) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	t.Date = jx.Deref(raw.Date)
+	dateStr := jx.Deref(raw.Date)
+	if dateStr != "" {
+		if dt, err := when.ParseDateTime(dateStr); err == nil {
+			t.Date = dt
+		}
+	}
 	t.Currency = Currency(jx.Deref(raw.Currency))
 	t.FxRate = raw.FxRate
 	t.Price = raw.Price

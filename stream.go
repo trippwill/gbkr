@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/trippwill/gbkr/internal/transport"
+	"github.com/trippwill/gbkr/when"
 )
 
 const keepaliveInterval = 25 * time.Second
@@ -264,9 +265,9 @@ func deriveWSURL(baseURL string) (string, error) {
 
 // Notification represents a gateway notification message.
 type Notification struct {
-	ID   string `json:"id"`
-	Date string `json:"date"`
-	Text string `json:"text"`
+	ID   string    `json:"id"`
+	Date when.Date `json:"date"`
+	Text string    `json:"text"`
 }
 
 // Notifications subscribes to gateway notification messages. The returned

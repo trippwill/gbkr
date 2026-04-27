@@ -90,8 +90,8 @@ func TestContractDetails_Option(t *testing.T) {
 	if cd.Strike != 190.0 {
 		t.Errorf("Strike = %f", cd.Strike)
 	}
-	if cd.Expiry != "20240119" {
-		t.Errorf("Expiry = %q", cd.Expiry)
+	if !cd.Expiry.Valid || cd.Expiry.Date.String() != "2024-01-19" {
+		t.Errorf("Expiry = %v", cd.Expiry)
 	}
 	if cd.PutOrCall != "C" {
 		t.Errorf("PutOrCall = %q", cd.PutOrCall)

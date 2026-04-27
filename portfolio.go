@@ -10,6 +10,7 @@ import (
 
 	"github.com/trippwill/gbkr/internal/jx"
 	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
 )
 
 // Position represents a single portfolio position returned by
@@ -42,7 +43,7 @@ type Position struct {
 	// Ticker is the ticker symbol.
 	Ticker string
 	// Expiry is the contract expiry date (e.g., "20240119"). Empty for non-expiry instruments.
-	Expiry string
+	Expiry when.NullDate
 	// PutOrCall indicates "P" (put) or "C" (call) for options. Empty for non-options.
 	PutOrCall string
 	// Strike is the option strike price. May be null or zero for non-options.
@@ -99,7 +100,7 @@ func (p *Position) UnmarshalJSON(data []byte) error {
 	p.Currency = Currency(jx.Deref(raw.Currency))
 	p.AssetClass = AssetClass(jx.Deref(raw.AssetClass))
 	p.Ticker = jx.Deref(raw.Ticker)
-	p.Expiry = jx.Deref(raw.Expiry)
+	p.Expiry = parseNullDateFromJSON(jx.Deref(raw.Expiry))
 	p.PutOrCall = jx.Deref(raw.PutOrCall)
 	p.Strike = raw.Strike
 	p.UndConID = ConID(jx.Deref(raw.UndConID))
@@ -121,8 +122,8 @@ type PortfolioSummaryField struct {
 	IsNull bool
 	// Severity is the severity level of the field.
 	Severity int
-	// Timestamp is the epoch time when the field was last updated.
-	Timestamp int64
+	// Timestamp is the time when the field was last updated.
+	Timestamp when.DateTime
 	// Value is the string representation of the field.
 	Value string
 }
@@ -145,7 +146,7 @@ func (f *PortfolioSummaryField) UnmarshalJSON(data []byte) error {
 	f.Currency = Currency(jx.Deref(raw.Currency))
 	f.IsNull = jx.Deref(raw.IsNull)
 	f.Severity = jx.Deref(raw.Severity)
-	f.Timestamp = jx.Deref(raw.Timestamp)
+	f.Timestamp = when.DateTimeFromEpoch(jx.Deref(raw.Timestamp))
 	f.Value = jx.Deref(raw.Value)
 	return nil
 }

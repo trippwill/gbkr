@@ -1,6 +1,9 @@
 package flex
 
-import "github.com/trippwill/gbkr/num"
+import (
+	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
+)
 
 // QueryResponse is the top-level envelope returned by the Flex Web Service
 // GetStatement endpoint for a successfully generated report.
@@ -12,11 +15,11 @@ type QueryResponse struct {
 
 // Statement contains the report data for a single account.
 type Statement struct {
-	AccountID     string // IBKR account identifier (e.g., "U1234567")
-	FromDate      string // Report start date
-	ToDate        string // Report end date
-	Period        string // Report period label (e.g., "YTD", "Q1", "LastMonth")
-	WhenGenerated string // Timestamp when the report was generated
+	AccountID     string        // IBKR account identifier (e.g., "U1234567")
+	FromDate      when.Date     // Report start date
+	ToDate        when.Date     // Report end date
+	Period        string        // Report period label (e.g., "YTD", "Q1", "LastMonth")
+	WhenGenerated when.DateTime // Timestamp when the report was generated
 
 	Trades            []Trade
 	CashTransactions  []CashTransaction
@@ -53,14 +56,14 @@ type Trade struct {
 	CostBasis     num.NullNum // FIFO cost basis; absent if not computed
 	RealizedPnL   num.NullNum // IBKR: fifoPnlRealized — FIFO realized P&L
 	Strike        num.NullNum // Option strike price; absent for stock trades
-	Expiry        string      // Option expiry date; empty for stock trades
-	PutCall       string      // "C" or "P" for options; empty for stock trades
-	OpenClose     string      // IBKR: openCloseIndicator — "O" or "C"
-	OrderRef      string      // IBKR: orderReference — user-assigned order ref
-	Currency      string      // Settlement currency (e.g., "USD")
-	Multiplier    num.Num     // Contract multiplier (1 for stock, 100 for US equity options)
-	TradeDate     string      // Execution date
-	SettleDate    string      // Settlement date; may be empty
+	Expiry        when.NullDate // Option expiry date; absent for stock trades
+	PutCall       string        // "C" or "P" for options; empty for stock trades
+	OpenClose     string        // IBKR: openCloseIndicator — "O" or "C"
+	OrderRef      string        // IBKR: orderReference — user-assigned order ref
+	Currency      string        // Settlement currency (e.g., "USD")
+	Multiplier    num.Num       // Contract multiplier (1 for stock, 100 for US equity options)
+	TradeDate     when.Date     // Execution date
+	SettleDate    when.NullDate // Settlement date; may be empty
 }
 
 // CashTransaction represents a dividend, interest charge, fee, or other
@@ -74,8 +77,8 @@ type CashTransaction struct {
 	Amount        num.Num // Signed: positive for credits, negative for debits
 	Currency      string  // Settlement currency
 	Description   string  // IBKR: description — human-readable details
-	ReportDate    string  // Date the transaction was reported
-	SettleDate    string  // Settlement date
+	ReportDate    when.Date // Date the transaction was reported
+	SettleDate    when.Date // Settlement date
 }
 
 // OptionEvent represents an option exercise, assignment, or expiration
@@ -88,12 +91,12 @@ type OptionEvent struct {
 	Underlying      string  // IBKR: underlyingSymbol
 	UnderlyingID    int64   // IBKR: underlyingConid
 	Strike          num.Num // Option strike price
-	Expiry          string  // Option expiry date
+	Expiry          when.NullDate // Option expiry date
 	PutCall         string  // "C" or "P"
 	Quantity        num.Num // Signed: positive for long, negative for short
 	Proceeds        num.Num // Cash proceeds from the event
 	RealizedPnL     num.Num // IBKR: realizedPnl
-	TradeDate       string  // Date the event occurred
+	TradeDate       when.Date     // Date the event occurred
 	Currency        string  // Settlement currency
 	Multiplier      num.Num // Contract multiplier (typically 100)
 }
@@ -113,7 +116,7 @@ type CommissionDetail struct {
 	RegFINRATradingActivityFee num.Num // FINRA TAF
 	RegSection31TransactionFee num.Num // SEC Section 31 fee
 	Currency                   string  // Fee currency
-	TradeDate                  string  // Trade execution date
+	TradeDate                  when.Date // Trade execution date
 }
 
 // sendRequestResponse is the XML envelope returned by the SendRequest endpoint.

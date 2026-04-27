@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/trippwill/gbkr/internal/jx"
+	"github.com/trippwill/gbkr/when"
 )
 
 // TradingSchedule is the response for GET /contract/trading-schedule.
@@ -15,9 +16,9 @@ import (
 type TradingSchedule struct {
 	// ExchangeTimezone is the IANA timezone of the exchange (e.g., "US/Eastern").
 	ExchangeTimezone string
-	// Schedules maps date strings ("YYYYMMDD") to their trading sessions.
+	// Schedules maps dates to their trading sessions.
 	// Dates absent from this map are non-trading days (holidays, weekends).
-	Schedules map[string]TradingDay
+	Schedules map[when.Date]TradingDay
 }
 
 // TradingDay holds the trading hours for a single date.
@@ -30,10 +31,10 @@ type TradingDay struct {
 
 // TradingSession represents a contiguous block of trading time.
 type TradingSession struct {
-	// Opening is the session start as a Unix epoch timestamp (seconds).
-	Opening int64
-	// Closing is the session end as a Unix epoch timestamp (seconds).
-	Closing int64
+	// Opening is the session start time.
+	Opening when.DateTime
+	// Closing is the session end time.
+	Closing when.DateTime
 	// CancelDayOrders indicates whether day orders are canceled at session close.
 	CancelDayOrders bool
 }
@@ -47,7 +48,16 @@ func (ts *TradingSchedule) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	ts.ExchangeTimezone = jx.Deref(aux.ExchangeTimezone)
-	ts.Schedules = aux.Schedules
+	if len(aux.Schedules) > 0 {
+		ts.Schedules = make(map[when.Date]TradingDay, len(aux.Schedules))
+		for k, v := range aux.Schedules {
+			d, err := when.ParseDate(k)
+			if err != nil {
+				continue
+			}
+			ts.Schedules[d] = v
+		}
+	}
 	return nil
 }
 
@@ -73,8 +83,8 @@ func (s *TradingSession) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	s.Opening = jx.Deref(raw.Opening)
-	s.Closing = jx.Deref(raw.Closing)
+	s.Opening = when.DateTimeFromEpoch(jx.Deref(raw.Opening))
+	s.Closing = when.DateTimeFromEpoch(jx.Deref(raw.Closing))
 	s.CancelDayOrders = jx.Deref(raw.CancelDayOrders)
 	return nil
 }

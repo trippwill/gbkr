@@ -13,6 +13,7 @@ import (
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/transport"
 	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
 )
 
 // MarketDataUpdate represents a streaming market data tick.
@@ -142,7 +143,7 @@ func SubscribeMarketData(s *gbkr.Stream, conID gbkr.ConID, fields ...SnapshotFie
 // Topic: smh+{conid}.
 type HistorySubscriptionBar struct {
 	ConID  gbkr.ConID
-	Time   string
+	Time   when.DateTime
 	Open   num.Num
 	High   num.Num
 	Low    num.Num
@@ -195,12 +196,14 @@ func SubscribeMarketDataHistory(s *gbkr.Stream, conID gbkr.ConID) (updates <-cha
 		}
 		bar := HistorySubscriptionBar{
 			ConID:  conID,
-			Time:   wire.Time,
 			Open:   wire.Open,
 			High:   wire.High,
 			Low:    wire.Low,
 			Close:  wire.Close,
 			Volume: wire.Volume,
+		}
+		if dt, err := when.ParseDateTime(wire.Time); err == nil {
+			bar.Time = dt
 		}
 
 		if obs := s.Observer(); obs != nil {
