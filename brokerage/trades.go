@@ -117,9 +117,11 @@ func (t *TradeExecution) UnmarshalJSON(data []byte) error {
 	if epoch := jx.Deref(raw.TradeTimeEpoch); epoch != 0 {
 		t.TradeTime = when.DateTimeFromEpoch(epoch)
 	} else if s := jx.Deref(raw.TradeTime); s != "" {
-		if dt, err := when.ParseDateTime(s); err == nil {
-			t.TradeTime = dt
+		dt, err := when.ParseDateTime(s)
+		if err != nil {
+			return fmt.Errorf("parse trade_time %q: %w", s, err)
 		}
+		t.TradeTime = dt
 	}
 	t.Quantity = raw.Quantity
 	t.Price = raw.Price

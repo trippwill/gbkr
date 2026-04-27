@@ -146,7 +146,9 @@ func (f *PortfolioSummaryField) UnmarshalJSON(data []byte) error {
 	f.Currency = Currency(jx.Deref(raw.Currency))
 	f.IsNull = jx.Deref(raw.IsNull)
 	f.Severity = jx.Deref(raw.Severity)
-	f.Timestamp = when.DateTimeFromEpoch(jx.Deref(raw.Timestamp))
+	if raw.Timestamp != nil {
+		f.Timestamp = when.DateTimeFromEpoch(*raw.Timestamp)
+	}
 	f.Value = jx.Deref(raw.Value)
 	return nil
 }

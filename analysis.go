@@ -46,8 +46,12 @@ func (r *TransactionHistoryResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	r.Currency = Currency(jx.Deref(raw.Currency))
-	r.From = when.DateTimeFromEpoch(jx.Deref(raw.From))
-	r.To = when.DateTimeFromEpoch(jx.Deref(raw.To))
+	if raw.From != nil {
+		r.From = when.DateTimeFromEpoch(*raw.From)
+	}
+	if raw.To != nil {
+		r.To = when.DateTimeFromEpoch(*raw.To)
+	}
 	r.IncludesRealTime = jx.Deref(raw.IncludesRealTime)
 	if raw.Transactions != nil {
 		if err := json.Unmarshal(*raw.Transactions, &r.Transactions); err != nil {
@@ -103,9 +107,11 @@ func (t *Transaction) UnmarshalJSON(data []byte) error {
 	}
 	dateStr := jx.Deref(raw.Date)
 	if dateStr != "" {
-		if dt, err := when.ParseDateTime(dateStr); err == nil {
-			t.Date = dt
+		dt, err := when.ParseDateTime(dateStr)
+		if err != nil {
+			return fmt.Errorf("parse transaction date %q: %w", dateStr, err)
 		}
+		t.Date = dt
 	}
 	t.Currency = Currency(jx.Deref(raw.Currency))
 	t.FxRate = raw.FxRate

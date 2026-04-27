@@ -3,6 +3,7 @@ package gbkr
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"time"
@@ -53,7 +54,7 @@ func (ts *TradingSchedule) UnmarshalJSON(data []byte) error {
 		for k, v := range aux.Schedules {
 			d, err := when.ParseDate(k)
 			if err != nil {
-				continue
+				return fmt.Errorf("schedule date key %q: %w", k, err)
 			}
 			ts.Schedules[d] = v
 		}
@@ -83,8 +84,12 @@ func (s *TradingSession) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	s.Opening = when.DateTimeFromEpoch(jx.Deref(raw.Opening))
-	s.Closing = when.DateTimeFromEpoch(jx.Deref(raw.Closing))
+	if raw.Opening != nil {
+		s.Opening = when.DateTimeFromEpoch(*raw.Opening)
+	}
+	if raw.Closing != nil {
+		s.Closing = when.DateTimeFromEpoch(*raw.Closing)
+	}
 	s.CancelDayOrders = jx.Deref(raw.CancelDayOrders)
 	return nil
 }

@@ -49,8 +49,8 @@ func DateTimeFromEpochSec(sec int64) DateTime {
 
 // DateTimeFromEpoch creates a DateTime from a Unix epoch value,
 // automatically detecting whether it is in seconds or milliseconds.
-// Values with absolute magnitude >= 1e12 are treated as milliseconds;
-// smaller values are treated as seconds.
+// Values with absolute magnitude >= epochMsThreshold are treated as
+// milliseconds; smaller values are treated as seconds.
 func DateTimeFromEpoch(epoch int64) DateTime {
 	if epoch >= epochMsThreshold || epoch <= -epochMsThreshold {
 		return DateTimeFromEpochMs(epoch)
@@ -60,6 +60,7 @@ func DateTimeFromEpoch(epoch int64) DateTime {
 
 // ParseDateTime parses a datetime string. Accepted formats:
 //   - "YYYYMMDD-HH:MM:SS" (REST JSON trade time)
+//   - "YYYYMMDD HH:MM:SS" (streaming history bars)
 //   - "YYYY-MM-DD;HH:MM:SS" (Flex XML timestamp)
 //   - "YYYY-MM-DDTHH:MM:SSZ" (ISO 8601 / RFC 3339)
 //   - "YYYY-MM-DDTHH:MM:SS" (ISO 8601 without timezone)
@@ -124,7 +125,7 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 	}
 
 	// Try bare integer (epoch timestamp).
-	if len(s) > 0 && (s[0] >= '0' && s[0] <= '9' || s[0] == '-') {
+	if len(s) > 0 && ((s[0] >= '0' && s[0] <= '9') || s[0] == '-') {
 		epoch, err := strconv.ParseInt(s, 10, 64)
 		if err == nil {
 			if epoch >= epochMsThreshold || epoch <= -epochMsThreshold {

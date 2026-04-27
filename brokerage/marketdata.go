@@ -406,6 +406,8 @@ func (b *HistoryBar) UnmarshalJSON(data []byte) error {
 	b.Low = raw.Low
 	b.Close = raw.Close
 	b.Volume = raw.Volume
-	b.Time = when.DateTimeFromEpoch(jx.Deref(raw.Time))
+	if raw.Time != nil {
+		b.Time = when.DateTimeFromEpoch(*raw.Time)
+	}
 	return nil
 }
