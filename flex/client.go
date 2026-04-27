@@ -10,9 +10,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/trippwill/gbkr/when"
 )
 
 const (
@@ -90,6 +93,12 @@ func NewClient(opts ...Option) *Client {
 // SendRequest initiates report generation for the given query ID and returns
 // a reference code for use with [Client.GetStatement].
 func (c *Client) SendRequest(ctx context.Context, token, queryID string) (string, error) {
+	return c.sendRequest(ctx, token, queryID, nil)
+}
+
+// sendRequest is the internal implementation that supports optional date parameters
+// from [fetchConfig]. When cfg is nil, no date parameters are sent.
+func (c *Client) sendRequest(ctx context.Context, token, queryID string, cfg *fetchConfig) (string, error) {
 	start := time.Now()
 
 	u, err := url.JoinPath(c.baseURL, "SendRequest")
@@ -101,6 +110,18 @@ func (c *Client) SendRequest(ctx context.Context, token, queryID string) (string
 		"t": {token},
 		"q": {queryID},
 		"v": {"3"},
+	}
+
+	if cfg != nil {
+		if cfg.dateFrom != "" {
+			q.Set("fd", cfg.dateFrom)
+		}
+		if cfg.dateTo != "" {
+			q.Set("td", cfg.dateTo)
+		}
+		if cfg.period > 0 {
+			q.Set("p", strconv.Itoa(cfg.period))
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u+"?"+q.Encode(), nil)
@@ -270,6 +291,11 @@ type fetchConfig struct {
 	maxRetries   int
 	initialDelay time.Duration
 	backoffMult  float64
+
+	// Date override — mutually exclusive groups; last-wins.
+	dateFrom string // YYYYMMDD, set by WithDateRange
+	dateTo   string // YYYYMMDD, set by WithDateRange
+	period   int    // calendar days, set by WithPeriod
 }
 
 // WithMaxRetries sets the maximum number of GetStatement retries (default 3).
@@ -287,6 +313,36 @@ func WithBackoffMultiplier(m float64) FetchOption {
 	return func(fc *fetchConfig) { fc.backoffMult = m }
 }
 
+// WithDateRange overrides the saved Flex Query date range with explicit from/to
+// dates. The dates are sent as fd and td query parameters in YYYYMMDD format.
+// Overrides any prior [WithPeriod] call (last-wins semantics).
+// Zero-valued dates are ignored.
+func WithDateRange(from, to when.Date) FetchOption {
+	return func(fc *fetchConfig) {
+		if from.IsZero() || to.IsZero() {
+			return
+		}
+		fc.dateFrom = from.Time().Format("20060102")
+		fc.dateTo = to.Time().Format("20060102")
+		fc.period = 0
+	}
+}
+
+// WithPeriod overrides the saved Flex Query period with a number of calendar days.
+// The period is sent as the p query parameter.
+// Overrides any prior [WithDateRange] call (last-wins semantics).
+// Non-positive values are ignored.
+func WithPeriod(days int) FetchOption {
+	return func(fc *fetchConfig) {
+		if days <= 0 {
+			return
+		}
+		fc.period = days
+		fc.dateFrom = ""
+		fc.dateTo = ""
+	}
+}
+
 // FetchReport runs the full two-step retrieval protocol: SendRequest followed
 // by polling GetStatement with exponential backoff until the report is ready
 // or retries are exhausted.
@@ -300,7 +356,7 @@ func (c *Client) FetchReport(ctx context.Context, token, queryID string, opts ..
 		o(&cfg)
 	}
 
-	ref, err := c.SendRequest(ctx, token, queryID)
+	ref, err := c.sendRequest(ctx, token, queryID, &cfg)
 	if err != nil {
 		return nil, err
 	}

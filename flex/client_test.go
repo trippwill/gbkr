@@ -6,12 +6,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/trippwill/gbkr/when"
 )
 
 func writeXML(t *testing.T, w http.ResponseWriter, data []byte) {
@@ -771,5 +774,379 @@ func TestSendRequest_HTTPStatusError_EmptyBody(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unexpected HTTP") {
 		t.Errorf("error = %v, want HTTP status error", err)
+	}
+}
+
+func TestFetchReport_WithDateRange(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, stmtData)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	from := when.NewDate(2026, 1, 15)
+	to := when.NewDate(2026, 3, 20)
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(0),
+		WithDateRange(from, to),
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	if got := capturedQuery.Get("fd"); got != "20260115" {
+		t.Errorf("fd = %q, want %q", got, "20260115")
+	}
+	if got := capturedQuery.Get("td"); got != "20260320" {
+		t.Errorf("td = %q, want %q", got, "20260320")
+	}
+	if got := capturedQuery.Get("p"); got != "" {
+		t.Errorf("p = %q, want empty", got)
+	}
+}
+
+func TestFetchReport_WithPeriod(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, stmtData)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(0),
+		WithPeriod(30),
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	if got := capturedQuery.Get("p"); got != "30" {
+		t.Errorf("p = %q, want %q", got, "30")
+	}
+	if got := capturedQuery.Get("fd"); got != "" {
+		t.Errorf("fd = %q, want empty", got)
+	}
+	if got := capturedQuery.Get("td"); got != "" {
+		t.Errorf("td = %q, want empty", got)
+	}
+}
+
+func TestFetchReport_LastWins_PeriodOverridesDateRange(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, stmtData)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	from := when.NewDate(2026, 1, 1)
+	to := when.NewDate(2026, 1, 31)
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(0),
+		WithDateRange(from, to),
+		WithPeriod(7), // Last wins: period overrides date range
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	if got := capturedQuery.Get("p"); got != "7" {
+		t.Errorf("p = %q, want %q", got, "7")
+	}
+	if got := capturedQuery.Get("fd"); got != "" {
+		t.Errorf("fd = %q, want empty (period should override)", got)
+	}
+	if got := capturedQuery.Get("td"); got != "" {
+		t.Errorf("td = %q, want empty (period should override)", got)
+	}
+}
+
+func TestFetchReport_LastWins_DateRangeOverridesPeriod(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, stmtData)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	from := when.NewDate(2026, 2, 1)
+	to := when.NewDate(2026, 2, 28)
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(0),
+		WithPeriod(7),
+		WithDateRange(from, to), // Last wins: date range overrides period
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	if got := capturedQuery.Get("fd"); got != "20260201" {
+		t.Errorf("fd = %q, want %q", got, "20260201")
+	}
+	if got := capturedQuery.Get("td"); got != "20260228" {
+		t.Errorf("td = %q, want %q", got, "20260228")
+	}
+	if got := capturedQuery.Get("p"); got != "" {
+		t.Errorf("p = %q, want empty (date range should override)", got)
+	}
+}
+
+func TestFetchReport_DateParamsSurviveRetry(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	errorData := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<FlexStatementResponse><Status>Warn</Status><ErrorCode>1019</ErrorCode><ErrorMessage>Statement generation in progress. Please try again shortly.</ErrorMessage></FlexStatementResponse>`)
+
+	var getAttempts atomic.Int32
+	var capturedQuery url.Values
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			n := getAttempts.Add(1)
+			if n <= 1 {
+				writeXML(t, w, errorData)
+			} else {
+				writeXML(t, w, stmtData)
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	from := when.NewDate(2026, 6, 1)
+	to := when.NewDate(2026, 6, 30)
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(2),
+		WithBackoffMultiplier(1.0),
+		WithDateRange(from, to),
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	// Verify date params were sent to SendRequest even though GetStatement retried
+	if got := capturedQuery.Get("fd"); got != "20260601" {
+		t.Errorf("fd = %q, want %q", got, "20260601")
+	}
+	if got := capturedQuery.Get("td"); got != "20260630" {
+		t.Errorf("td = %q, want %q", got, "20260630")
+	}
+	if got := getAttempts.Load(); got != 2 {
+		t.Errorf("GetStatement attempts = %d, want 2 (1 retry + 1 success)", got)
+	}
+}
+
+func TestSendRequest_NoDateParams(t *testing.T) {
+	// Verify the public SendRequest method does not send date params.
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedQuery = r.URL.Query()
+		writeXML(t, w, sendData)
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.SendRequest(context.Background(), "TOKEN", "QID")
+	if err != nil {
+		t.Fatalf("SendRequest: %v", err)
+	}
+
+	if got := capturedQuery.Get("fd"); got != "" {
+		t.Errorf("fd = %q, want empty", got)
+	}
+	if got := capturedQuery.Get("td"); got != "" {
+		t.Errorf("td = %q, want empty", got)
+	}
+	if got := capturedQuery.Get("p"); got != "" {
+		t.Errorf("p = %q, want empty", got)
+	}
+}
+
+func TestFetchReport_WithDateRange_ZeroDatesIgnored(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, stmtData)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(0),
+		WithDateRange(when.Date{}, when.Date{}),
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	// Zero dates should not generate fd/td params
+	if got := capturedQuery.Get("fd"); got != "" {
+		t.Errorf("fd = %q, want empty (zero dates should be ignored)", got)
+	}
+	if got := capturedQuery.Get("td"); got != "" {
+		t.Errorf("td = %q, want empty (zero dates should be ignored)", got)
+	}
+}
+
+func TestFetchReport_WithPeriod_NonPositiveIgnored(t *testing.T) {
+	sendData, err := os.ReadFile(filepath.Join("testdata", "send_request_success.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmtData, err := os.ReadFile(filepath.Join("testdata", "activity_statement.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/SendRequest":
+			capturedQuery = r.URL.Query()
+			writeXML(t, w, sendData)
+		case "/GetStatement":
+			writeXML(t, w, stmtData)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	from := when.NewDate(2026, 3, 1)
+	to := when.NewDate(2026, 3, 31)
+
+	c := NewClient(WithBaseURL(srv.URL + "/"))
+	_, err = c.FetchReport(context.Background(), "TOKEN", "QID",
+		WithInitialDelay(10*time.Millisecond),
+		WithMaxRetries(0),
+		WithDateRange(from, to),
+		WithPeriod(0), // Non-positive: should be ignored, not clear date range
+	)
+	if err != nil {
+		t.Fatalf("FetchReport: %v", err)
+	}
+
+	// Date range should still be set (WithPeriod(0) was ignored)
+	if got := capturedQuery.Get("fd"); got != "20260301" {
+		t.Errorf("fd = %q, want %q (non-positive period should not clear dates)", got, "20260301")
+	}
+	if got := capturedQuery.Get("td"); got != "20260331" {
+		t.Errorf("td = %q, want %q (non-positive period should not clear dates)", got, "20260331")
+	}
+	if got := capturedQuery.Get("p"); got != "" {
+		t.Errorf("p = %q, want empty (non-positive period ignored)", got)
 	}
 }
