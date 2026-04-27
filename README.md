@@ -186,12 +186,8 @@ uses the original API keys so wire compatibility is preserved.
 
 ## Flex Web Service (`gbkr/flex`)
 
-The `flex` subpackage is a separate Go module for retrieving IBKR Activity Statement reports
+The `flex` subpackage retrieves IBKR Activity Statement reports
 via the Flex Web Service — a standalone IBKR API independent of the Client Portal Gateway.
-
-```bash
-go get github.com/trippwill/gbkr/flex
-```
 
 ### What it does
 
@@ -254,8 +250,6 @@ if errors.Is(err, flex.ErrTokenExpired) {
 mise run precommit   # fmt → build → test with race detection
 mise run ci          # full CI pipeline
 mise run vet         # golangci-lint
-mise run flex:precommit  # run the flex module precommit pipeline from repo root
-mise run flex:ci         # run the flex module CI pipeline from repo root
 ```
 
 See [AGENTS.md](AGENTS.md) for full development guidelines.
