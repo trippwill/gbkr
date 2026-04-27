@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
 )
 
 // FieldError describes a single field that failed to parse during wire → domain mapping.
@@ -85,12 +86,25 @@ func ParseActivityStatement(r io.Reader) (*QueryResponse, error) {
 }
 
 func mapStatement(ws xmlStatement) (Statement, error) {
+	fromDate, err := parseDate(ws.FromDate, "fromDate")
+	if err != nil {
+		return Statement{}, err
+	}
+	toDate, err := parseDate(ws.ToDate, "toDate")
+	if err != nil {
+		return Statement{}, err
+	}
+	whenGenerated, err := parseDateTime(ws.WhenGenerated, "whenGenerated")
+	if err != nil {
+		return Statement{}, err
+	}
+
 	stmt := Statement{
 		AccountID:     ws.AccountID,
-		FromDate:      ws.FromDate,
-		ToDate:        ws.ToDate,
+		FromDate:      fromDate,
+		ToDate:        toDate,
 		Period:        ws.Period,
-		WhenGenerated: ws.WhenGenerated,
+		WhenGenerated: whenGenerated,
 	}
 
 	for i, wt := range ws.Trades {
@@ -139,6 +153,11 @@ func mapTrade(w xmlTrade) (Trade, error) {
 		return Trade{}, err
 	}
 
+	tradeDate, err := parseDate(w.TradeDate, "tradeDate")
+	if err != nil {
+		return Trade{}, err
+	}
+
 	return Trade{
 		TransactionID: w.TransactionID,
 		TradeID:       w.TradeID,
@@ -161,19 +180,29 @@ func mapTrade(w xmlTrade) (Trade, error) {
 		CostBasis:     parseNullNum(w.CostBasis),
 		RealizedPnL:   parseNullNum(w.FIFOPnlRealized),
 		Strike:        parseNullNum(w.Strike),
-		Expiry:        w.Expiry,
+		Expiry:        parseNullDate(w.Expiry),
 		PutCall:       w.PutCall,
 		OpenClose:     w.OpenCloseIndicator,
 		OrderRef:      w.OrderReference,
 		Currency:      w.Currency,
 		Multiplier:    parseNum(w.Multiplier),
-		TradeDate:     w.TradeDate,
-		SettleDate:    w.SettleDate,
+		TradeDate:     tradeDate,
+		SettleDate:    parseNullDate(w.SettleDate),
 	}, nil
 }
 
 func mapCashTransaction(w xmlCashTransaction) (CashTransaction, error) {
 	conID, err := parseInt64(w.ConID, "conid")
+	if err != nil {
+		return CashTransaction{}, err
+	}
+
+	reportDate, err := parseDate(w.ReportDate, "reportDate")
+	if err != nil {
+		return CashTransaction{}, err
+	}
+
+	settleDate, err := parseDate(w.SettleDate, "settleDate")
 	if err != nil {
 		return CashTransaction{}, err
 	}
@@ -187,8 +216,8 @@ func mapCashTransaction(w xmlCashTransaction) (CashTransaction, error) {
 		Amount:        parseNum(w.Amount),
 		Currency:      w.Currency,
 		Description:   w.Description,
-		ReportDate:    w.ReportDate,
-		SettleDate:    w.SettleDate,
+		ReportDate:    reportDate,
+		SettleDate:    settleDate,
 	}, nil
 }
 
@@ -203,6 +232,11 @@ func mapOptionEvent(w xmlOptionEvent) (OptionEvent, error) {
 		return OptionEvent{}, err
 	}
 
+	tradeDate, err := parseDate(w.TradeDate, "tradeDate")
+	if err != nil {
+		return OptionEvent{}, err
+	}
+
 	return OptionEvent{
 		TransactionType: w.TransactionType,
 		AccountID:       w.AccountID,
@@ -211,12 +245,12 @@ func mapOptionEvent(w xmlOptionEvent) (OptionEvent, error) {
 		Underlying:      w.UnderlyingSymbol,
 		UnderlyingID:    underlyingID,
 		Strike:          parseNum(w.Strike),
-		Expiry:          w.Expiry,
+		Expiry:          parseNullDate(w.Expiry),
 		PutCall:         w.PutCall,
 		Quantity:        parseNum(w.Quantity),
 		Proceeds:        parseNum(w.Proceeds),
 		RealizedPnL:     parseNum(w.RealizedPnl),
-		TradeDate:       w.TradeDate,
+		TradeDate:       tradeDate,
 		Currency:        w.Currency,
 		Multiplier:      parseNum(w.Multiplier),
 	}, nil
@@ -224,6 +258,11 @@ func mapOptionEvent(w xmlOptionEvent) (OptionEvent, error) {
 
 func mapCommissionDetail(w xmlCommissionDetail) (CommissionDetail, error) {
 	conID, err := parseInt64(w.ConID, "conid")
+	if err != nil {
+		return CommissionDetail{}, err
+	}
+
+	tradeDate, err := parseDate(w.TradeDate, "tradeDate")
 	if err != nil {
 		return CommissionDetail{}, err
 	}
@@ -240,7 +279,7 @@ func mapCommissionDetail(w xmlCommissionDetail) (CommissionDetail, error) {
 		RegFINRATradingActivityFee: parseNum(w.RegFINRATradingActivityFee),
 		RegSection31TransactionFee: parseNum(w.RegSection31TransactionFee),
 		Currency:                   w.Currency,
-		TradeDate:                  w.TradeDate,
+		TradeDate:                  tradeDate,
 	}, nil
 }
 
@@ -272,6 +311,47 @@ func parseNullNum(s string) num.NullNum {
 		return num.NullNum{}
 	}
 	return num.NullNum{Num: num.FromString(s), Valid: true}
+}
+
+// parseDate parses a required date field from XML. Returns an error if the
+// string is non-empty and fails to parse.
+func parseDate(s, field string) (when.Date, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return when.Date{}, nil
+	}
+	d, err := when.ParseDate(s)
+	if err != nil {
+		return when.Date{}, fmt.Errorf("parse %s %q: %w", field, s, err)
+	}
+	return d, nil
+}
+
+// parseNullDate maps an optional XML date string to a NullDate.
+// Empty/whitespace-only → NullDate{Valid: false}.
+func parseNullDate(s string) when.NullDate {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return when.NullDate{}
+	}
+	d, err := when.ParseDate(s)
+	if err != nil {
+		return when.NullDate{}
+	}
+	return when.NullDate{Date: d, Valid: true}
+}
+
+// parseDateTime parses a required datetime field from XML.
+func parseDateTime(s, field string) (when.DateTime, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return when.DateTime{}, nil
+	}
+	dt, err := when.ParseDateTime(s)
+	if err != nil {
+		return when.DateTime{}, fmt.Errorf("parse %s %q: %w", field, s, err)
+	}
+	return dt, nil
 }
 
 // validateResponse checks all required Num fields for parse errors.
