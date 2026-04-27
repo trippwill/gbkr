@@ -41,3 +41,7 @@ component_management:
       name: transport
       paths:
         - "internal/transport/**"
+    - component_id: when
+      name: when
+      paths:
+        - "when/**"
