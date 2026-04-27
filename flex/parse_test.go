@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/trippwill/gbkr/num"
+	"github.com/trippwill/gbkr/when"
 )
 
 func TestParseActivityStatement(t *testing.T) {
@@ -37,8 +38,8 @@ func TestParseActivityStatement(t *testing.T) {
 	if stmt.AccountID != "U1234567" {
 		t.Errorf("AccountID = %q, want %q", stmt.AccountID, "U1234567")
 	}
-	if stmt.FromDate != "2026-01-01" {
-		t.Errorf("FromDate = %q, want %q", stmt.FromDate, "2026-01-01")
+	if !stmt.FromDate.Equal(when.NewDate(2026, 1, 1)) {
+		t.Errorf("FromDate = %v, want 2026-01-01", stmt.FromDate)
 	}
 
 	// Trades
