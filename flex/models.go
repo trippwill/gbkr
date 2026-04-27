@@ -35,27 +35,27 @@ type Statement struct {
 // [num.NullNum]. Field names use domain vocabulary; the original IBKR Flex
 // attribute name is noted where they differ.
 type Trade struct {
-	TransactionID string      // IBKR: transactionID
-	TradeID       string      // IBKR: tradeID
-	OrderID       string      // IBKR: ibOrderID
-	ExecID        string      // IBKR: ibExecID
-	AccountID     string      // IBKR: accountId
-	ConID         int64       // IBKR: conid — contract identifier
-	Symbol        string      // IBKR: symbol
-	Underlying    string      // IBKR: underlyingSymbol — empty for non-derivative trades
-	UnderlyingID  int64       // IBKR: underlyingConid — 0 for non-derivative trades
-	AssetClass    string      // IBKR: assetCategory — "STK", "OPT", etc.
-	Side          string      // IBKR: buySell — "BUY" or "SELL"
-	Quantity      num.Num     // Signed: positive for buys, negative for sells
-	Price         num.Num     // IBKR: tradePrice — per-unit execution price
-	TradeMoney    num.Num     // IBKR: tradeMoney — quantity × price
-	Proceeds      num.Num     // Net proceeds (negative for buys)
-	Commission    num.Num     // IBKR: ibCommission — typically negative
-	Taxes         num.Num     // Regulatory taxes
-	NetCash       num.NullNum // Net cash impact; absent if not in query template
-	CostBasis     num.NullNum // FIFO cost basis; absent if not computed
-	RealizedPnL   num.NullNum // IBKR: fifoPnlRealized — FIFO realized P&L
-	Strike        num.NullNum // Option strike price; absent for stock trades
+	TransactionID string        // IBKR: transactionID
+	TradeID       string        // IBKR: tradeID
+	OrderID       string        // IBKR: ibOrderID
+	ExecID        string        // IBKR: ibExecID
+	AccountID     string        // IBKR: accountId
+	ConID         int64         // IBKR: conid — contract identifier
+	Symbol        string        // IBKR: symbol
+	Underlying    string        // IBKR: underlyingSymbol — empty for non-derivative trades
+	UnderlyingID  int64         // IBKR: underlyingConid — 0 for non-derivative trades
+	AssetClass    string        // IBKR: assetCategory — "STK", "OPT", etc.
+	Side          string        // IBKR: buySell — "BUY" or "SELL"
+	Quantity      num.Num       // Signed: positive for buys, negative for sells
+	Price         num.Num       // IBKR: tradePrice — per-unit execution price
+	TradeMoney    num.Num       // IBKR: tradeMoney — quantity × price
+	Proceeds      num.Num       // Net proceeds (negative for buys)
+	Commission    num.Num       // IBKR: ibCommission — typically negative
+	Taxes         num.Num       // Regulatory taxes
+	NetCash       num.NullNum   // Net cash impact; absent if not in query template
+	CostBasis     num.NullNum   // FIFO cost basis; absent if not computed
+	RealizedPnL   num.NullNum   // IBKR: fifoPnlRealized — FIFO realized P&L
+	Strike        num.NullNum   // Option strike price; absent for stock trades
 	Expiry        when.NullDate // Option expiry date; absent for stock trades
 	PutCall       string        // "C" or "P" for options; empty for stock trades
 	OpenClose     string        // IBKR: openCloseIndicator — "O" or "C"
@@ -69,14 +69,14 @@ type Trade struct {
 // CashTransaction represents a dividend, interest charge, fee, or other
 // cash movement from the Cash Transactions section of an Activity Flex Query.
 type CashTransaction struct {
-	TransactionID string  // IBKR: transactionID — may be empty on SUMMARY rows
-	AccountID     string  // IBKR: accountId
-	ConID         int64   // IBKR: conid — 0 for account-level entries (e.g., margin interest)
-	Symbol        string  // IBKR: symbol — empty for account-level entries
-	Type          string  // IBKR: type — "Dividends", "Withholding Tax", "Broker Interest Paid", etc.
-	Amount        num.Num // Signed: positive for credits, negative for debits
-	Currency      string  // Settlement currency
-	Description   string  // IBKR: description — human-readable details
+	TransactionID string    // IBKR: transactionID — may be empty on SUMMARY rows
+	AccountID     string    // IBKR: accountId
+	ConID         int64     // IBKR: conid — 0 for account-level entries (e.g., margin interest)
+	Symbol        string    // IBKR: symbol — empty for account-level entries
+	Type          string    // IBKR: type — "Dividends", "Withholding Tax", "Broker Interest Paid", etc.
+	Amount        num.Num   // Signed: positive for credits, negative for debits
+	Currency      string    // Settlement currency
+	Description   string    // IBKR: description — human-readable details
 	ReportDate    when.Date // Date the transaction was reported
 	SettleDate    when.Date // Settlement date
 }
@@ -84,38 +84,38 @@ type CashTransaction struct {
 // OptionEvent represents an option exercise, assignment, or expiration
 // from the Option Exercises, Assignments & Expirations (OptionEAE) section.
 type OptionEvent struct {
-	TransactionType string  // "Exercise", "Assignment", or "Expiration"
-	AccountID       string  // IBKR: accountId
-	ConID           int64   // IBKR: conid — option contract identifier
-	Symbol          string  // IBKR: symbol — OCC-style option symbol
-	Underlying      string  // IBKR: underlyingSymbol
-	UnderlyingID    int64   // IBKR: underlyingConid
-	Strike          num.Num // Option strike price
+	TransactionType string        // "Exercise", "Assignment", or "Expiration"
+	AccountID       string        // IBKR: accountId
+	ConID           int64         // IBKR: conid — option contract identifier
+	Symbol          string        // IBKR: symbol — OCC-style option symbol
+	Underlying      string        // IBKR: underlyingSymbol
+	UnderlyingID    int64         // IBKR: underlyingConid
+	Strike          num.Num       // Option strike price
 	Expiry          when.NullDate // Option expiry date
-	PutCall         string  // "C" or "P"
-	Quantity        num.Num // Signed: positive for long, negative for short
-	Proceeds        num.Num // Cash proceeds from the event
-	RealizedPnL     num.Num // IBKR: realizedPnl
+	PutCall         string        // "C" or "P"
+	Quantity        num.Num       // Signed: positive for long, negative for short
+	Proceeds        num.Num       // Cash proceeds from the event
+	RealizedPnL     num.Num       // IBKR: realizedPnl
 	TradeDate       when.Date     // Date the event occurred
-	Currency        string  // Settlement currency
-	Multiplier      num.Num // Contract multiplier (typically 100)
+	Currency        string        // Settlement currency
+	Multiplier      num.Num       // Contract multiplier (typically 100)
 }
 
 // CommissionDetail provides a granular fee breakdown for a single trade
 // from the Commission Details section. All charge fields are [num.Num]
 // representing the dollar amount of each fee component.
 type CommissionDetail struct {
-	AccountID                  string  // IBKR: accountId
-	ConID                      int64   // IBKR: conid
-	Symbol                     string  // IBKR: symbol
-	TradeID                    string  // IBKR: tradeID — links to [Trade.TradeID]
-	ExecID                     string  // IBKR: execID — links to [Trade.ExecID]
-	BrokerExecutionCharge      num.Num // Broker execution fee
-	BrokerClearingCharge       num.Num // Broker clearing fee
-	ThirdPartyExecutionCharge  num.Num // Exchange/third-party execution fee
-	RegFINRATradingActivityFee num.Num // FINRA TAF
-	RegSection31TransactionFee num.Num // SEC Section 31 fee
-	Currency                   string  // Fee currency
+	AccountID                  string    // IBKR: accountId
+	ConID                      int64     // IBKR: conid
+	Symbol                     string    // IBKR: symbol
+	TradeID                    string    // IBKR: tradeID — links to [Trade.TradeID]
+	ExecID                     string    // IBKR: execID — links to [Trade.ExecID]
+	BrokerExecutionCharge      num.Num   // Broker execution fee
+	BrokerClearingCharge       num.Num   // Broker clearing fee
+	ThirdPartyExecutionCharge  num.Num   // Exchange/third-party execution fee
+	RegFINRATradingActivityFee num.Num   // FINRA TAF
+	RegSection31TransactionFee num.Num   // SEC Section 31 fee
+	Currency                   string    // Fee currency
 	TradeDate                  when.Date // Trade execution date
 }
 
