@@ -379,6 +379,7 @@ func TestParseDateTimeFormats(t *testing.T) {
 	}{
 		{"REST trade", "20231211-18:00:49", time.Date(2023, 12, 11, 18, 0, 49, 0, time.UTC)},
 		{"Flex timestamp", "2026-03-20;19:30:00", time.Date(2026, 3, 20, 19, 30, 0, 0, time.UTC)},
+		{"Flex compact", "20260428;153347", time.Date(2026, 4, 28, 15, 33, 47, 0, time.UTC)},
 		{"RFC 3339", "2026-03-20T19:30:00Z", time.Date(2026, 3, 20, 19, 30, 0, 0, time.UTC)},
 		{"ISO no TZ", "2026-03-20T19:30:00", time.Date(2026, 3, 20, 19, 30, 0, 0, time.UTC)},
 	}
