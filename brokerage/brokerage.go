@@ -28,6 +28,13 @@ func NewSession(ctx context.Context, client *gbkr.Client, req *SSOInitRequest) (
 	return &Client{client: client}, nil
 }
 
+// ClientFrom wraps an existing [*gbkr.Client] as a brokerage [*Client]
+// without performing SSO initialization. Use when the caller has already
+// verified the session is elevated (e.g., via broker.Service state tracking).
+func ClientFrom(client *gbkr.Client) *Client {
+	return &Client{client: client}
+}
+
 // SSOInitRequest is the request body for POST /iserver/auth/ssodh/init.
 type SSOInitRequest struct {
 	// Compete determines if other brokerage sessions should be disconnected.
