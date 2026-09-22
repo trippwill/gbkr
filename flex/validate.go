@@ -217,12 +217,24 @@ func optionEventFieldZero(oe *OptionEvent, field string) bool {
 	case "Underlying":
 		return oe.Underlying == ""
 	case "UnderlyingID":
+		if oe.AssetCategory != "" && oe.AssetCategory != "OPT" {
+			return false
+		}
 		return oe.UnderlyingID == 0
 	case "Strike":
-		return numZero(oe.Strike)
+		if oe.AssetCategory != "" && oe.AssetCategory != "OPT" {
+			return false
+		}
+		return !oe.Strike.Valid || numZero(oe.Strike.Num)
 	case "Expiry":
+		if oe.AssetCategory != "" && oe.AssetCategory != "OPT" {
+			return false
+		}
 		return !oe.Expiry.Valid
 	case "PutCall":
+		if oe.AssetCategory != "" && oe.AssetCategory != "OPT" {
+			return false
+		}
 		return oe.PutCall == ""
 	case "Quantity":
 		return numZero(oe.Quantity)

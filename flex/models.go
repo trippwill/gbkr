@@ -24,6 +24,8 @@ type Statement struct {
 	Trades            []Trade
 	CashTransactions  []CashTransaction
 	OptionEvents      []OptionEvent
+	Transfers         []Transfer
+	TransferLots      []TransferLot
 	CommissionDetails []CommissionDetail
 }
 
@@ -63,6 +65,7 @@ type Trade struct {
 	Currency      string        // Settlement currency (e.g., "USD")
 	Multiplier    num.Num       // Contract multiplier (1 for stock, 100 for US equity options)
 	TradeDate     when.Date     // Execution date
+	TradeTime     when.DateTime // Execution timestamp
 	SettleDate    when.NullDate // Settlement date; may be empty
 }
 
@@ -81,24 +84,67 @@ type CashTransaction struct {
 	SettleDate    when.Date // Settlement date
 }
 
-// OptionEvent represents an option exercise, assignment, or expiration
-// from the Option Exercises, Assignments & Expirations (OptionEAE) section.
+// OptionEvent represents a leg of an option exercise, assignment, or expiration
+// from OptionEAE. IBKR includes both option and resulting stock legs.
 type OptionEvent struct {
-	TransactionType string        // "Exercise", "Assignment", or "Expiration"
+	TransactionType string        // "Exercise", "Assignment", "Expiration", "Buy", or "Sell"
 	AccountID       string        // IBKR: accountId
-	ConID           int64         // IBKR: conid — option contract identifier
-	Symbol          string        // IBKR: symbol — OCC-style option symbol
+	TradeID         string        // IBKR: tradeID
+	ConID           int64         // IBKR: conid
+	Symbol          string        // IBKR: symbol
+	AssetCategory   string        // IBKR: assetCategory, typically "OPT" or "STK"
 	Underlying      string        // IBKR: underlyingSymbol
 	UnderlyingID    int64         // IBKR: underlyingConid
-	Strike          num.Num       // Option strike price
+	Strike          num.NullNum   // Option strike price; absent on resulting stock legs
 	Expiry          when.NullDate // Option expiry date
 	PutCall         string        // "C" or "P"
 	Quantity        num.Num       // Signed: positive for long, negative for short
+	TradePrice      num.NullNum   // Price of the event leg
 	Proceeds        num.Num       // Cash proceeds from the event
+	CommissionTax   num.NullNum   // IBKR: commisionsAndTax
+	CostBasis       num.NullNum   // IBKR: costBasis
 	RealizedPnL     num.Num       // IBKR: realizedPnl
 	TradeDate       when.Date     // Date the event occurred
 	Currency        string        // Settlement currency
 	Multiplier      num.Num       // Contract multiplier (typically 100)
+}
+
+// Transfer represents a security or cash transfer summary from the Transfers section.
+type Transfer struct {
+	TransactionID    string
+	AccountID        string
+	ConID            int64
+	Symbol           string
+	AssetClass       string
+	Type             string
+	Direction        string
+	SourceAccount    string
+	DeliveringBroker string
+	Quantity         num.Num
+	TransferPrice    num.NullNum
+	Cost             num.NullNum
+	PositionAmount   num.NullNum
+	CashTransfer     num.NullNum
+	Currency         string
+	ReportDate       when.Date
+	SettleDate       when.NullDate
+}
+
+// TransferLot preserves the original acquisition basis of a transferred position.
+type TransferLot struct {
+	AccountID     string
+	ConID         int64
+	Symbol        string
+	AssetClass    string
+	Type          string
+	Direction     string
+	SourceAccount string
+	Quantity      num.Num
+	TransferPrice num.NullNum
+	Cost          num.NullNum
+	Currency      string
+	ReportDate    when.Date
+	OpenDate      when.NullDate
 }
 
 // CommissionDetail provides a granular fee breakdown for a single trade

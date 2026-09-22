@@ -70,6 +70,9 @@ func TestParseActivityStatement(t *testing.T) {
 	if tr.AssetClass != "STK" {
 		t.Errorf("Trade[0].AssetClass = %q, want %q", tr.AssetClass, "STK")
 	}
+	if got := tr.TradeTime.String(); got != "2026-01-15T14:30:25.000Z" {
+		t.Errorf("Trade[0].TradeTime = %q, want 2026-01-15T14:30:25.000Z", got)
+	}
 
 	// NullNum fields: stock trade has empty strike/expiry
 	if tr.Strike.Valid {
@@ -138,11 +141,15 @@ func TestParseActivityStatement(t *testing.T) {
 	if oe.TransactionType != "Assignment" {
 		t.Errorf("OptionEvent[0].TransactionType = %q, want %q", oe.TransactionType, "Assignment")
 	}
-	assertNum(t, "OptionEvent[0].Strike", oe.Strike, "180")
+	if !oe.Strike.Valid {
+		t.Fatal("OptionEvent[0].Strike should be valid")
+	}
+	assertNum(t, "OptionEvent[0].Strike", oe.Strike.Num, "180")
 	assertNum(t, "OptionEvent[0].Proceeds", oe.Proceeds, "18000.00")
 	if oe.Underlying != "AAPL" {
 		t.Errorf("OptionEvent[0].Underlying = %q, want %q", oe.Underlying, "AAPL")
 	}
+
 	if oe.UnderlyingID != 265598 {
 		t.Errorf("OptionEvent[0].UnderlyingID = %d, want %d", oe.UnderlyingID, 265598)
 	}
@@ -154,6 +161,97 @@ func TestParseActivityStatement(t *testing.T) {
 	cd := stmt.CommissionDetails[0]
 	assertNum(t, "CommissionDetail[0].BrokerExecutionCharge", cd.BrokerExecutionCharge, "0.50")
 	assertNum(t, "CommissionDetail[0].RegFINRATradingActivityFee", cd.RegFINRATradingActivityFee, "0.0119")
+}
+
+func TestMapOptionEvent_AllowsStockLegWithoutStrike(t *testing.T) {
+	event, err := mapOptionEvent(xmlOptionEvent{
+		TransactionType:  "Sell",
+		AccountID:        "U1",
+		TradeID:          "8923952312",
+		ConID:            "9599491",
+		Symbol:           "F",
+		AssetCategory:    "STK",
+		UnderlyingConID:  "",
+		UnderlyingSymbol: "F",
+		Strike:           "",
+		Expiry:           "",
+		PutCall:          "",
+		Quantity:         "-200",
+		TradePrice:       "13.5",
+		Proceeds:         "2700",
+		CommissionTax:    "-0.039",
+		CostBasis:        "-2701",
+		RealizedPnl:      "38.33692",
+		Date:             "20260130",
+		Currency:         "USD",
+		Multiplier:       "1",
+	})
+	if err != nil {
+		t.Fatalf("mapOptionEvent: %v", err)
+	}
+
+	if event.Strike.Valid {
+		t.Errorf("Strike = %v, want null for stock leg", event.Strike)
+	}
+	if event.AssetCategory != "STK" || event.TradeID != "8923952312" {
+		t.Errorf("classification = %q/%q, want STK/8923952312", event.AssetCategory, event.TradeID)
+	}
+	if !event.CostBasis.Valid {
+		t.Errorf("CostBasis.Valid = %v, want true", event.CostBasis.Valid)
+	}
+	if event.CostBasis.Valid {
+		assertNum(t, "CostBasis", event.CostBasis.Num, "-2701")
+	}
+}
+
+func TestMapTransferAndLot_PreserveBasis(t *testing.T) {
+	transfer, err := mapTransfer(xmlTransfer{
+		TransactionID:    "36781049859",
+		AccountID:        "U1",
+		ConID:            "272093",
+		Symbol:           "MSFT",
+		AssetCategory:    "STK",
+		Type:             "ACATS",
+		Direction:        "IN",
+		Account:          "X77669318",
+		DeliveringBroker: "0226",
+		Quantity:         "100",
+		TransferPrice:    "0",
+		Cost:             "28970.54",
+		PositionAmount:   "48347",
+		CashTransfer:     "0",
+		Currency:         "USD",
+		ReportDate:       "20251212",
+		SettleDate:       "20251215",
+	})
+	if err != nil {
+		t.Fatalf("mapTransfer: %v", err)
+	}
+	assertNum(t, "Transfer.Cost", transfer.Cost.Num, "28970.54")
+
+	lot, err := mapTransferLot(xmlTransferLot{
+		AccountID:     "U1",
+		ConID:         "272093",
+		Symbol:        "MSFT",
+		AssetCategory: "STK",
+		Type:          "ACATS",
+		Direction:     "IN",
+		Account:       "X77669318",
+		Quantity:      "3.971",
+		TransferPrice: "273.238478973",
+		Cost:          "1085.03",
+		Currency:      "USD",
+		ReportDate:    "20251212",
+		OpenDateTime:  "20220531",
+	})
+	if err != nil {
+		t.Fatalf("mapTransferLot: %v", err)
+	}
+	assertNum(t, "TransferLot.Quantity", lot.Quantity, "3.971")
+	assertNum(t, "TransferLot.Cost", lot.Cost.Num, "1085.03")
+	if !lot.OpenDate.Valid || lot.OpenDate.Date.String() != "2022-05-31" {
+		t.Errorf("OpenDate = %v, want 2022-05-31", lot.OpenDate)
+	}
 }
 
 func TestParseActivityStatement_Empty(t *testing.T) {
@@ -837,8 +935,7 @@ func BenchmarkMapStatement(b *testing.B) {
 		})
 	}
 
-	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_, err := mapStatement(ws)
 		if err != nil {
 			b.Fatal(err)
