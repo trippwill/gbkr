@@ -22,6 +22,8 @@ type xmlStatement struct {
 	Trades        []xmlTrade            `xml:"Trades>Trade"`
 	CashTxns      []xmlCashTransaction  `xml:"CashTransactions>CashTransaction"`
 	OptionEvents  []xmlOptionEvent      `xml:"OptionEAE>OptionEAE"`
+	Transfers     []xmlTransfer         `xml:"Transfers>Transfer"`
+	TransferLots  []xmlTransferLot      `xml:"Transfers>TransferLot"`
 	Commissions   []xmlCommissionDetail `xml:"CommissionDetails>CommissionDetail"`
 }
 
@@ -52,6 +54,7 @@ type xmlTrade struct {
 	OpenCloseIndicator string `xml:"openCloseIndicator,attr"`
 	OrderReference     string `xml:"orderReference,attr"`
 	TradeDate          string `xml:"tradeDate,attr"`
+	DateTime           string `xml:"dateTime,attr"`
 	SettleDate         string `xml:"settleDate,attr"`
 	Currency           string `xml:"currency,attr"`
 	Multiplier         string `xml:"multiplier,attr"`
@@ -73,19 +76,61 @@ type xmlCashTransaction struct {
 type xmlOptionEvent struct {
 	TransactionType  string `xml:"transactionType,attr"`
 	AccountID        string `xml:"accountId,attr"`
+	TradeID          string `xml:"tradeID,attr"`
 	ConID            string `xml:"conid,attr"`
 	Symbol           string `xml:"symbol,attr"`
+	AssetCategory    string `xml:"assetCategory,attr"`
 	UnderlyingSymbol string `xml:"underlyingSymbol,attr"`
 	UnderlyingConID  string `xml:"underlyingConid,attr"`
 	Strike           string `xml:"strike,attr"`
 	Expiry           string `xml:"expiry,attr"`
 	PutCall          string `xml:"putCall,attr"`
 	Quantity         string `xml:"quantity,attr"`
+	TradePrice       string `xml:"tradePrice,attr"`
 	Proceeds         string `xml:"proceeds,attr"`
+	CommissionTax    string `xml:"commisionsAndTax,attr"`
+	CostBasis        string `xml:"costBasis,attr"`
 	RealizedPnl      string `xml:"realizedPnl,attr"`
+	Date             string `xml:"date,attr"`
 	TradeDate        string `xml:"tradeDate,attr"`
 	Currency         string `xml:"currency,attr"`
 	Multiplier       string `xml:"multiplier,attr"`
+}
+
+type xmlTransfer struct {
+	TransactionID    string `xml:"transactionID,attr"`
+	AccountID        string `xml:"accountId,attr"`
+	ConID            string `xml:"conid,attr"`
+	Symbol           string `xml:"symbol,attr"`
+	AssetCategory    string `xml:"assetCategory,attr"`
+	Type             string `xml:"type,attr"`
+	Direction        string `xml:"direction,attr"`
+	Account          string `xml:"account,attr"`
+	DeliveringBroker string `xml:"deliveringBroker,attr"`
+	Quantity         string `xml:"quantity,attr"`
+	TransferPrice    string `xml:"transferPrice,attr"`
+	Cost             string `xml:"cost,attr"`
+	PositionAmount   string `xml:"positionAmount,attr"`
+	CashTransfer     string `xml:"cashTransfer,attr"`
+	Currency         string `xml:"currency,attr"`
+	ReportDate       string `xml:"reportDate,attr"`
+	SettleDate       string `xml:"settleDate,attr"`
+}
+
+type xmlTransferLot struct {
+	AccountID     string `xml:"accountId,attr"`
+	ConID         string `xml:"conid,attr"`
+	Symbol        string `xml:"symbol,attr"`
+	AssetCategory string `xml:"assetCategory,attr"`
+	Type          string `xml:"type,attr"`
+	Direction     string `xml:"direction,attr"`
+	Account       string `xml:"account,attr"`
+	Quantity      string `xml:"quantity,attr"`
+	TransferPrice string `xml:"transferPrice,attr"`
+	Cost          string `xml:"cost,attr"`
+	Currency      string `xml:"currency,attr"`
+	ReportDate    string `xml:"reportDate,attr"`
+	OpenDateTime  string `xml:"openDateTime,attr"`
 }
 
 type xmlCommissionDetail struct {

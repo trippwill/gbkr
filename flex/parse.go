@@ -131,6 +131,22 @@ func mapStatement(ws xmlStatement) (Statement, error) {
 		stmt.OptionEvents = append(stmt.OptionEvents, oe)
 	}
 
+	for i, wt := range ws.Transfers {
+		transfer, err := mapTransfer(wt)
+		if err != nil {
+			return stmt, fmt.Errorf("transfer %d: %w", i, err)
+		}
+		stmt.Transfers = append(stmt.Transfers, transfer)
+	}
+
+	for i, wt := range ws.TransferLots {
+		lot, err := mapTransferLot(wt)
+		if err != nil {
+			return stmt, fmt.Errorf("transfer lot %d: %w", i, err)
+		}
+		stmt.TransferLots = append(stmt.TransferLots, lot)
+	}
+
 	for i, wcd := range ws.Commissions {
 		cd, err := mapCommissionDetail(wcd)
 		if err != nil {
@@ -154,6 +170,10 @@ func mapTrade(w xmlTrade) (Trade, error) {
 	}
 
 	tradeDate, err := parseDate(w.TradeDate, "tradeDate")
+	if err != nil {
+		return Trade{}, err
+	}
+	tradeTime, err := parseDateTime(w.DateTime, "dateTime")
 	if err != nil {
 		return Trade{}, err
 	}
@@ -187,6 +207,7 @@ func mapTrade(w xmlTrade) (Trade, error) {
 		Currency:      w.Currency,
 		Multiplier:    parseNum(w.Multiplier),
 		TradeDate:     tradeDate,
+		TradeTime:     tradeTime,
 		SettleDate:    parseNullDate(w.SettleDate),
 	}, nil
 }
@@ -232,7 +253,11 @@ func mapOptionEvent(w xmlOptionEvent) (OptionEvent, error) {
 		return OptionEvent{}, err
 	}
 
-	tradeDate, err := parseDate(w.TradeDate, "tradeDate")
+	date := w.Date
+	if date == "" {
+		date = w.TradeDate
+	}
+	tradeDate, err := parseDate(date, "date")
 	if err != nil {
 		return OptionEvent{}, err
 	}
@@ -240,19 +265,80 @@ func mapOptionEvent(w xmlOptionEvent) (OptionEvent, error) {
 	return OptionEvent{
 		TransactionType: w.TransactionType,
 		AccountID:       w.AccountID,
+		TradeID:         w.TradeID,
 		ConID:           conID,
 		Symbol:          w.Symbol,
+		AssetCategory:   w.AssetCategory,
 		Underlying:      w.UnderlyingSymbol,
 		UnderlyingID:    underlyingID,
-		Strike:          parseNum(w.Strike),
+		Strike:          parseNullNum(w.Strike),
 		Expiry:          parseNullDate(w.Expiry),
 		PutCall:         w.PutCall,
 		Quantity:        parseNum(w.Quantity),
+		TradePrice:      parseNullNum(w.TradePrice),
 		Proceeds:        parseNum(w.Proceeds),
+		CommissionTax:   parseNullNum(w.CommissionTax),
+		CostBasis:       parseNullNum(w.CostBasis),
 		RealizedPnL:     parseNum(w.RealizedPnl),
 		TradeDate:       tradeDate,
 		Currency:        w.Currency,
 		Multiplier:      parseNum(w.Multiplier),
+	}, nil
+}
+
+func mapTransfer(w xmlTransfer) (Transfer, error) {
+	conID, err := parseInt64(w.ConID, "conid")
+	if err != nil {
+		return Transfer{}, err
+	}
+	reportDate, err := parseDate(w.ReportDate, "reportDate")
+	if err != nil {
+		return Transfer{}, err
+	}
+	return Transfer{
+		TransactionID:    w.TransactionID,
+		AccountID:        w.AccountID,
+		ConID:            conID,
+		Symbol:           w.Symbol,
+		AssetClass:       w.AssetCategory,
+		Type:             w.Type,
+		Direction:        w.Direction,
+		SourceAccount:    w.Account,
+		DeliveringBroker: w.DeliveringBroker,
+		Quantity:         parseNum(w.Quantity),
+		TransferPrice:    parseNullNum(w.TransferPrice),
+		Cost:             parseNullNum(w.Cost),
+		PositionAmount:   parseNullNum(w.PositionAmount),
+		CashTransfer:     parseNullNum(w.CashTransfer),
+		Currency:         w.Currency,
+		ReportDate:       reportDate,
+		SettleDate:       parseNullDate(w.SettleDate),
+	}, nil
+}
+
+func mapTransferLot(w xmlTransferLot) (TransferLot, error) {
+	conID, err := parseInt64(w.ConID, "conid")
+	if err != nil {
+		return TransferLot{}, err
+	}
+	reportDate, err := parseDate(w.ReportDate, "reportDate")
+	if err != nil {
+		return TransferLot{}, err
+	}
+	return TransferLot{
+		AccountID:     w.AccountID,
+		ConID:         conID,
+		Symbol:        w.Symbol,
+		AssetClass:    w.AssetCategory,
+		Type:          w.Type,
+		Direction:     w.Direction,
+		SourceAccount: w.Account,
+		Quantity:      parseNum(w.Quantity),
+		TransferPrice: parseNullNum(w.TransferPrice),
+		Cost:          parseNullNum(w.Cost),
+		Currency:      w.Currency,
+		ReportDate:    reportDate,
+		OpenDate:      parseNullDate(w.OpenDateTime),
 	}, nil
 }
 
@@ -375,11 +461,23 @@ func validateResponse(resp *QueryResponse) FieldErrors {
 			checkNum(&errs, "CashTransaction", i, "Amount", ct.Amount)
 		}
 		for i, oe := range stmt.OptionEvents {
-			checkNum(&errs, "OptionEvent", i, "Strike", oe.Strike)
+			checkNullNum(&errs, "OptionEvent", i, "Strike", oe.Strike)
 			checkNum(&errs, "OptionEvent", i, "Quantity", oe.Quantity)
 			checkNum(&errs, "OptionEvent", i, "Proceeds", oe.Proceeds)
 			checkNum(&errs, "OptionEvent", i, "RealizedPnL", oe.RealizedPnL)
 			checkNum(&errs, "OptionEvent", i, "Multiplier", oe.Multiplier)
+		}
+		for i, transfer := range stmt.Transfers {
+			checkNum(&errs, "Transfer", i, "Quantity", transfer.Quantity)
+			checkNullNum(&errs, "Transfer", i, "TransferPrice", transfer.TransferPrice)
+			checkNullNum(&errs, "Transfer", i, "Cost", transfer.Cost)
+			checkNullNum(&errs, "Transfer", i, "PositionAmount", transfer.PositionAmount)
+			checkNullNum(&errs, "Transfer", i, "CashTransfer", transfer.CashTransfer)
+		}
+		for i, lot := range stmt.TransferLots {
+			checkNum(&errs, "TransferLot", i, "Quantity", lot.Quantity)
+			checkNullNum(&errs, "TransferLot", i, "TransferPrice", lot.TransferPrice)
+			checkNullNum(&errs, "TransferLot", i, "Cost", lot.Cost)
 		}
 		for i, cd := range stmt.CommissionDetails {
 			checkNum(&errs, "CommissionDetail", i, "BrokerExecutionCharge", cd.BrokerExecutionCharge)

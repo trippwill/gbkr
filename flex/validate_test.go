@@ -224,7 +224,7 @@ func TestValidate_OptionEvents(t *testing.T) {
 	stmt := Statement{
 		OptionEvents: []OptionEvent{
 			{TransactionType: "Expiration", ConID: 99, Symbol: "SPY260320C500",
-				Strike: num.FromInt64(500), TradeDate: when.NewDate(2026, 3, 20),
+				Strike: num.NullNum{Num: num.FromInt64(500), Valid: true}, TradeDate: when.NewDate(2026, 3, 20),
 				Quantity: num.FromInt64(-1), Proceeds: num.FromInt64(0), RealizedPnL: num.FromInt64(0)},
 		},
 	}
@@ -238,6 +238,30 @@ func TestValidate_OptionEvents(t *testing.T) {
 	result := stmt.Validate(required)
 	if !result.OK() {
 		t.Errorf("expected OK, got MissingSections=%v, EmptyFields=%v", result.MissingSections, result.EmptyFields)
+	}
+}
+
+func TestValidate_OptionEventStockLegOptionFieldsNotApplicable(t *testing.T) {
+	stmt := Statement{
+		OptionEvents: []OptionEvent{{
+			TransactionType: "Sell",
+			AssetCategory:   "STK",
+			ConID:           9599491,
+			Symbol:          "F",
+			TradeDate:       when.NewDate(2026, 1, 30),
+			Quantity:        num.FromInt64(-200),
+			Proceeds:        num.FromInt64(2700),
+			RealizedPnL:     num.FromString("38.33692"),
+		}},
+	}
+
+	result := stmt.Validate(RequiredFields{
+		Sections: map[string][]string{
+			"OptionEvents": {"UnderlyingID", "Strike", "Expiry", "PutCall"},
+		},
+	})
+	if !result.OK() {
+		t.Errorf("stock leg option fields should be not applicable, got EmptyFields=%v", result.EmptyFields)
 	}
 }
 
@@ -413,7 +437,7 @@ func TestOptionEventFieldZero_AllFields(t *testing.T) {
 		Symbol:          "SPY260320C500",
 		Underlying:      "SPY",
 		UnderlyingID:    78,
-		Strike:          num.FromInt64(500),
+		Strike:          num.NullNum{Num: num.FromInt64(500), Valid: true},
 		Expiry:          when.NullDate{Date: when.NewDate(2026, 3, 20), Valid: true},
 		PutCall:         "C",
 		Quantity:        num.FromInt64(-1),
@@ -454,7 +478,7 @@ func TestOptionEventFieldZero_AllFields(t *testing.T) {
 
 	// Verify Num fields with explicit zero values.
 	zeroOE := OptionEvent{
-		Strike:      num.FromInt64(0),
+		Strike:      num.NullNum{Num: num.FromInt64(0), Valid: true},
 		Quantity:    num.FromInt64(0),
 		Proceeds:    num.FromInt64(0),
 		RealizedPnL: num.FromInt64(0),
@@ -572,7 +596,7 @@ func TestValidate_AllFieldsInAllSections(t *testing.T) {
 			{
 				TransactionType: "Expiration", AccountID: "U123", ConID: 99,
 				Symbol: "SPY260320C500", Underlying: "SPY", UnderlyingID: 78,
-				Strike:  num.FromInt64(500),
+				Strike:  num.NullNum{Num: num.FromInt64(500), Valid: true},
 				Expiry:  when.NullDate{Date: when.NewDate(2026, 3, 20), Valid: true},
 				PutCall: "C", Quantity: num.FromInt64(-1), Proceeds: num.FromInt64(100),
 				RealizedPnL: num.FromInt64(50), TradeDate: when.NewDate(2026, 3, 20),

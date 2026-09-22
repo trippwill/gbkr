@@ -62,6 +62,7 @@ func DateTimeFromEpoch(epoch int64) DateTime {
 // ParseDateTime parses a datetime string. Accepted formats:
 //   - "YYYYMMDD-HH:MM:SS" (REST JSON trade time)
 //   - "YYYYMMDD HH:MM:SS" (streaming history bars)
+//   - "YYYYMMDD;HHMMSS" (Flex XML trade timestamp)
 //   - "YYYY-MM-DD;HH:MM:SS" (Flex XML timestamp)
 //   - "YYYY-MM-DDTHH:MM:SSZ" (ISO 8601 / RFC 3339)
 //   - "YYYY-MM-DDTHH:MM:SS" (ISO 8601 without timezone)
