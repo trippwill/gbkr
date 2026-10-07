@@ -1,6 +1,6 @@
 package flex
 
-import "github.com/trippwill/gbkr/num"
+import "go.trippwill.dev/num"
 
 // RequiredFields specifies which Statement sections and fields a consumer
 // expects. Keys are section names matching Statement struct field names

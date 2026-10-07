@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trippwill/gbkr/num"
 	"github.com/trippwill/gbkr/when"
+	"go.trippwill.dev/num"
 )
 
 func TestParseActivityStatement(t *testing.T) {

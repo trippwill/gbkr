@@ -10,7 +10,7 @@ import (
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
-	"github.com/trippwill/gbkr/num"
+	"go.trippwill.dev/num"
 )
 
 // Accounts provides discovery of IBKR accounts without scoping to a specific one.

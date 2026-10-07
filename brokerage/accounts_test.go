@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/trippwill/gbkr"
-	"github.com/trippwill/gbkr/num"
+	"go.trippwill.dev/num"
 )
 
 func TestAccounts_List(t *testing.T) {

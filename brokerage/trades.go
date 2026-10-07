@@ -9,8 +9,8 @@ import (
 
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/internal/jx"
-	"github.com/trippwill/gbkr/num"
 	"github.com/trippwill/gbkr/when"
+	"go.trippwill.dev/num"
 )
 
 // Trades provides read access to recent trade executions (brokerage session required).

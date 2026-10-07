@@ -4,8 +4,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/trippwill/gbkr/num"
 	"github.com/trippwill/gbkr/when"
+	"go.trippwill.dev/num"
 )
 
 func TestValidate_OK_AllSectionsPresent(t *testing.T) {

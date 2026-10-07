@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/trippwill/gbkr/num"
 	"github.com/trippwill/gbkr/when"
+	"go.trippwill.dev/num"
 )
 
 // FieldError describes a single field that failed to parse during wire → domain mapping.

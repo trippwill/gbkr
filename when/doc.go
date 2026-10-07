@@ -27,7 +27,7 @@
 //
 // # Nullable Variants
 //
-// [NullDate] and [NullDateTime] follow the [github.com/trippwill/gbkr/num.NullNum]
+// [NullDate] and [NullDateTime] follow the [go.trippwill.dev/num.NullNum]
 // pattern: a Valid flag distinguishes absent values from zero. JSON null,
 // empty strings, and SQL NULL all map to Valid=false.
 package when

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/trippwill/gbkr/internal/jx"
-	"github.com/trippwill/gbkr/num"
 	"github.com/trippwill/gbkr/when"
+	"go.trippwill.dev/num"
 )
 
 // TransactionHistoryRequest is the request body for POST /pa/transactions.

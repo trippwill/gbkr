@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/trippwill/gbkr/num"
+	"go.trippwill.dev/num"
 )
 
 func TestPortfolio_Positions(t *testing.T) {
