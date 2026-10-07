@@ -1,8 +1,8 @@
 package flex
 
 import (
-	"github.com/trippwill/gbkr/num"
 	"github.com/trippwill/gbkr/when"
+	"go.trippwill.dev/num"
 )
 
 // QueryResponse is the top-level envelope returned by the Flex Web Service

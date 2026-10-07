@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/trippwill/gbkr/internal/jx"
-	"github.com/trippwill/gbkr/num"
 	"github.com/trippwill/gbkr/when"
+	"go.trippwill.dev/num"
 )
 
 // Position represents a single portfolio position returned by

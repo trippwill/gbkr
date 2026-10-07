@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/trippwill/gbkr/num"
+	"go.trippwill.dev/num"
 )
 
 func TestTrades_Recent(t *testing.T) {

@@ -14,7 +14,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/trippwill/gbkr"
 	"github.com/trippwill/gbkr/brokerage"
-	"github.com/trippwill/gbkr/num"
+	"go.trippwill.dev/num"
 )
 
 func testWSServer(t *testing.T, handler func(conn *websocket.Conn)) *httptest.Server {

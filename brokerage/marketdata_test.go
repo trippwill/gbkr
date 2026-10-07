@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/trippwill/gbkr"
-	"github.com/trippwill/gbkr/num"
+	"go.trippwill.dev/num"
 )
 
 func TestMarketData_Snapshot(t *testing.T) {

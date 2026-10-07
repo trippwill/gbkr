@@ -16,6 +16,15 @@ A Go client library for the [Interactive Brokers](https://www.interactivebrokers
 go get github.com/trippwill/gbkr
 ```
 
+Financial fields use `Num` and `NullNum` from the independently versioned MPL-2.0
+module `go.trippwill.dev/num`. Consumers should import that module; the former
+`github.com/trippwill/gbkr/num` package has been removed. To use the decimal types
+without the gateway client module:
+
+```bash
+go get go.trippwill.dev/num@v0.2.0
+```
+
 ## Quick Start
 
 ```go
